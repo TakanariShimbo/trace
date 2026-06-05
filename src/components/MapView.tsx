@@ -80,7 +80,7 @@ export default function MapView() {
     setPreview: (center: LonLat | null, radiusKm: number) => void;
     flyTo: (c: LonLat) => void;
     setBasemap: (layer: Basemap) => void;
-    setCelestialView: (center: { x: number; z: number } | null, diskRadiusWorld: number) => void;
+    setCelestialView: (center: { x: number; z: number } | null) => void;
     setCelestialSky: (sky: SkyState | null, sunTrack: SkyBody[], moonTrack: SkyBody[]) => void;
   } | null>(null);
 
@@ -97,7 +97,6 @@ export default function MapView() {
   // --- 太陽・月 --- //
   const [celestialOn, setCelestialOn] = useState(false);
   const [sunObserver, setSunObserver] = useState<LonLat | null>(null);
-  const [diskRadiusKm, setDiskRadiusKm] = useState(40); // 地形を切り抜く円盤の半径
   const [dateStr, setDateStr] = useState(() => toDateInput(new Date()));
   const [minutes, setMinutes] = useState(() => {
     const d = new Date();
@@ -172,11 +171,11 @@ export default function MapView() {
     const terrain = new QuadtreeTerrain(renderer);
     scene.add(terrain.group);
 
-    // 太陽・月の天球オーバーレイ（観測点中心）。
+    // 太陽・月の天球オーバーレイ（観測点中心）。半径はカメラ距離に連動（毎フレーム算出）。
     const celestial = new CelestialLayer();
     scene.add(celestial.group);
     let celestialCenter: THREE.Vector3 | null = null;
-    let celestialDomeR = 0; // ドーム半径(ワールド)。円盤の少し外に太陽月が来るよう disk 半径より大きめ。
+    let celestialCenterXZ: { x: number; z: number } | null = null;
 
     // --- 事前ロード範囲（中心＋半径）のプレビュー円。地形に隠れないよう常に手前に描く --- //
     const ringPts: THREE.Vector3[] = [];
@@ -230,11 +229,11 @@ export default function MapView() {
       setPreview,
       flyTo,
       setBasemap: (layer) => terrain.setBasemap(layer),
-      setCelestialView: (w, diskRadiusWorld) => {
+      setCelestialView: (w) => {
         celestialCenter = w ? new THREE.Vector3(w.x, 0, w.z) : null;
+        celestialCenterXZ = w;
         celestial.setVisible(!!w);
-        celestialDomeR = diskRadiusWorld * 1.1; // 太陽月は円盤の少し外側に
-        terrain.setClip(w, diskRadiusWorld); // 地形を観測点中心の円盤に切り抜く
+        if (!w) terrain.setClip(null, 0); // 解除時は全面表示へ
       },
       setCelestialSky: (sky, sunTrack, moonTrack) => celestial.setSky(sky, sunTrack, moonTrack),
     };
@@ -314,7 +313,12 @@ export default function MapView() {
       controls.update();
       const camDist = camera.position.distanceTo(controls.target);
       terrain.update(camera, mount.clientHeight, camDist);
-      if (celestialCenter) celestial.place(celestialCenter, celestialDomeR);
+      if (celestialCenter && celestialCenterXZ) {
+        // 半径をカメラ距離に連動。円盤を切り抜き、太陽月はその少し外側のドームに。
+        const diskR = THREE.MathUtils.clamp(camera.position.distanceTo(celestialCenter) * 0.5, 2, 4000);
+        terrain.setClip(celestialCenterXZ, diskR);
+        celestial.place(celestialCenter, diskR * 1.1);
+      }
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
@@ -365,24 +369,17 @@ export default function MapView() {
     const api = apiRef.current;
     if (!api) return;
     if (!celestialOn || !sunObserver || !skyInfo) {
-      api.setCelestialView(null, 0);
+      api.setCelestialView(null);
       return;
     }
     const sunTrack = computeTrack(skyDate, sunObserver.lat, sunObserver.lon, "sun");
     const moonTrack = computeTrack(skyDate, sunObserver.lat, sunObserver.lon, "moon");
     api.setCelestialSky(skyInfo, sunTrack, moonTrack);
-    // 円盤半径(km)→ワールド: 中心から北へ diskRadiusKm の点までのワールド距離。
-    const cz = mercYToWorld(latToMercY(sunObserver.lat));
-    const nz = mercYToWorld(latToMercY(sunObserver.lat + diskRadiusKm / 111.32));
-    const diskRWorld = Math.abs(nz - cz);
-    api.setCelestialView(
-      {
-        x: mercXToWorld(lonToMercX(sunObserver.lon)),
-        z: cz,
-      },
-      diskRWorld,
-    );
-  }, [celestialOn, sunObserver, skyDate, skyInfo, diskRadiusKm]);
+    api.setCelestialView({
+      x: mercXToWorld(lonToMercX(sunObserver.lon)),
+      z: mercYToWorld(latToMercY(sunObserver.lat)),
+    });
+  }, [celestialOn, sunObserver, skyDate, skyInfo]);
 
   // --- 画面ボタンのプレス/リリース --- //
   const start = (patch: Partial<Nav>) => (e: React.PointerEvent) => {
@@ -616,17 +613,6 @@ export default function MapView() {
                   観測点: {sunObserver.lat.toFixed(4)}°, {sunObserver.lon.toFixed(4)}°
                 </div>
               )}
-
-              <label className="save-field">
-                <span>円盤の半径: {diskRadiusKm} km</span>
-                <input
-                  type="range"
-                  min={5}
-                  max={120}
-                  value={diskRadiusKm}
-                  onChange={(e) => setDiskRadiusKm(Number(e.target.value))}
-                />
-              </label>
 
               <label className="save-field">
                 <span>日付</span>
