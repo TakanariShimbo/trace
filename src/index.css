@@ -41,7 +41,9 @@ body,
   color: #93a0b0;
   background: rgba(10, 13, 18, 0.6);
   border-radius: 6px;
-  pointer-events: none;
+}
+.attribution a {
+  color: #9fc1ec;
 }
 
 /* --- 地名検索（上中央） --- */

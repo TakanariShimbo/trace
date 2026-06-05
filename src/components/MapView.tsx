@@ -427,8 +427,8 @@ export default function MapView() {
         )}
       </div>
 
-      <button className="save-open" title="オフライン保存（事前ロード）" onClick={openPanel}>
-        ⤓ 保存
+      <button className="save-open" title="事前ダウンロード（オフライン保存）" onClick={openPanel}>
+        ⤓ 事前保存
       </button>
 
       {/* ベースマップ切替（左下） */}
@@ -579,7 +579,17 @@ export default function MapView() {
         </div>
       )}
 
-      <div className="attribution">地図・航空写真・標高: 国土地理院（GSI）タイル</div>
+      <div className="attribution">
+        出典:{" "}
+        <a
+          href="https://maps.gsi.go.jp/development/ichiran.html"
+          target="_blank"
+          rel="noreferrer"
+        >
+          地理院タイル
+        </a>
+        （国土地理院）を加工して表示
+      </div>
     </div>
   );
 }
