@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { QuadtreeTerrain } from "../terrain/QuadtreeTerrain";
+import { CelestialLayer } from "../terrain/CelestialLayer";
+import { computeSky, computeTrack, type SkyState, type SkyBody } from "../lib/celestial";
 import {
   IconMountain,
   IconPin,
@@ -62,6 +64,12 @@ const RADIUS_MIN = 1;
 const RADIUS_MAX = 50;
 const RADIUS_DEFAULT = 8;
 
+// Date → <input type="date"> 用のローカル日付文字列 (YYYY-MM-DD)。
+function toDateInput(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export default function MapView() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   // 画面ボタンとレンダリングループで共有する操作状態（.current は callback/effect 内でのみ触る）。
@@ -72,6 +80,8 @@ export default function MapView() {
     setPreview: (center: LonLat | null, radiusKm: number) => void;
     flyTo: (c: LonLat) => void;
     setBasemap: (layer: Basemap) => void;
+    setCelestialCenter: (world: { x: number; z: number } | null) => void;
+    setCelestialSky: (sky: SkyState | null, sunTrack: SkyBody[], moonTrack: SkyBody[]) => void;
   } | null>(null);
 
   // --- ベースマップ・検索の状態 --- //
@@ -83,6 +93,25 @@ export default function MapView() {
   // サイドバー開閉と、右下リモコンの表示。
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRemote, setShowRemote] = useState(true);
+
+  // --- 太陽・月 --- //
+  const [celestialOn, setCelestialOn] = useState(false);
+  const [sunObserver, setSunObserver] = useState<LonLat | null>(null);
+  const [dateStr, setDateStr] = useState(() => toDateInput(new Date()));
+  const [minutes, setMinutes] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+  // 日付＋時刻スライダーから観測日時を合成。
+  const skyDate = useMemo(() => {
+    const [y, mo, da] = dateStr.split("-").map(Number);
+    return new Date(y, (mo || 1) - 1, da || 1, Math.floor(minutes / 60), minutes % 60);
+  }, [dateStr, minutes]);
+  // 観測点＋日時から太陽月の状態（UI表示＆レイヤ反映に使う）。
+  const skyInfo = useMemo<SkyState | null>(
+    () => (celestialOn && sunObserver ? computeSky(skyDate, sunObserver.lat, sunObserver.lon) : null),
+    [celestialOn, sunObserver, skyDate],
+  );
 
   // --- 事前ロード（オフライン保存）UI の状態 --- //
   const [maxZ, setMaxZ] = useState(PREFETCH_Z_DEFAULT);
@@ -123,6 +152,7 @@ export default function MapView() {
       9000,
     );
     camera.position.set(0, 2200, 2600);
+    camera.layers.enable(1); // 月（レイヤ1）も描画する
 
     const controls = new MapControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -140,6 +170,11 @@ export default function MapView() {
 
     const terrain = new QuadtreeTerrain(renderer);
     scene.add(terrain.group);
+
+    // 太陽・月の天球オーバーレイ（観測点中心）。
+    const celestial = new CelestialLayer();
+    scene.add(celestial.group);
+    let celestialCenter: THREE.Vector3 | null = null;
 
     // --- 事前ロード範囲（中心＋半径）のプレビュー円。地形に隠れないよう常に手前に描く --- //
     const ringPts: THREE.Vector3[] = [];
@@ -193,6 +228,11 @@ export default function MapView() {
       setPreview,
       flyTo,
       setBasemap: (layer) => terrain.setBasemap(layer),
+      setCelestialCenter: (w) => {
+        celestialCenter = w ? new THREE.Vector3(w.x, 0, w.z) : null;
+        celestial.setVisible(!!w);
+      },
+      setCelestialSky: (sky, sunTrack, moonTrack) => celestial.setSky(sky, sunTrack, moonTrack),
     };
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
@@ -270,6 +310,7 @@ export default function MapView() {
       controls.update();
       const camDist = camera.position.distanceTo(controls.target);
       terrain.update(camera, mount.clientHeight, camDist);
+      if (celestialCenter) celestial.place(celestialCenter, camera.position.distanceTo(celestialCenter));
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
@@ -292,6 +333,7 @@ export default function MapView() {
       apiRef.current = null;
       previewRing.geometry.dispose();
       (previewRing.material as THREE.Material).dispose();
+      celestial.dispose();
       controls.dispose();
       terrain.dispose();
       renderer.dispose();
@@ -313,6 +355,23 @@ export default function MapView() {
   useEffect(() => {
     apiRef.current?.setBasemap(basemapById(basemapId));
   }, [basemapId]);
+
+  // 太陽・月: 観測点＋日時から sky/軌跡を計算して天球レイヤへ反映（描画side-effect）。
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    if (!celestialOn || !sunObserver || !skyInfo) {
+      api.setCelestialCenter(null);
+      return;
+    }
+    const sunTrack = computeTrack(skyDate, sunObserver.lat, sunObserver.lon, "sun");
+    const moonTrack = computeTrack(skyDate, sunObserver.lat, sunObserver.lon, "moon");
+    api.setCelestialSky(skyInfo, sunTrack, moonTrack);
+    api.setCelestialCenter({
+      x: mercXToWorld(lonToMercX(sunObserver.lon)),
+      z: mercYToWorld(latToMercY(sunObserver.lat)),
+    });
+  }, [celestialOn, sunObserver, skyDate, skyInfo]);
 
   // --- 画面ボタンのプレス/リリース --- //
   const start = (patch: Partial<Nav>) => (e: React.PointerEvent) => {
@@ -379,6 +438,21 @@ export default function MapView() {
     setQuery(r.title);
     setSidebarOpen(false); // 飛んだ先の地図が見えるよう閉じる
   };
+
+  // --- 太陽・月操作 --- //
+  const toggleCelestial = (on: boolean) => {
+    setCelestialOn(on);
+    if (on && !sunObserver) setSunObserver(apiRef.current?.getCenter() ?? null);
+  };
+  const captureSunObserver = () => setSunObserver(apiRef.current?.getCenter() ?? null);
+  const setSunNow = () => {
+    const d = new Date();
+    setDateStr(toDateInput(d));
+    setMinutes(d.getHours() * 60 + d.getMinutes());
+  };
+  const hhmm = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  const fmtTime = (d: Date | null) =>
+    d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "—";
 
   const SEARCH_MODES: { id: SearchMode; label: string }[] = [
     { id: "mountain", label: "山名" },
@@ -507,6 +581,78 @@ export default function MapView() {
             />
             <span>操作リモコンを表示（右下）</span>
           </label>
+        </section>
+
+        {/* 太陽・月 */}
+        <section className="side-sec">
+          <h3>太陽・月</h3>
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={celestialOn}
+              onChange={(e) => toggleCelestial(e.target.checked)}
+            />
+            <span>太陽・月を表示</span>
+          </label>
+
+          {celestialOn && (
+            <>
+              <button className="save-btn" onClick={captureSunObserver}>
+                画面中央を観測地点にする
+              </button>
+              {sunObserver && (
+                <div className="save-center">
+                  観測点: {sunObserver.lat.toFixed(4)}°, {sunObserver.lon.toFixed(4)}°
+                </div>
+              )}
+
+              <label className="save-field">
+                <span>日付</span>
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                />
+              </label>
+
+              <label className="save-field">
+                <span>時刻: {hhmm}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1439}
+                  value={minutes}
+                  onChange={(e) => setMinutes(Number(e.target.value))}
+                />
+              </label>
+
+              <button className="save-link" onClick={setSunNow}>
+                現在の日時にする
+              </button>
+
+              {skyInfo && (
+                <div className="save-plan">
+                  <div>
+                    ☀ 太陽: 方位 {skyInfo.sun.azimuthDeg.toFixed(0)}° / 高度{" "}
+                    {skyInfo.sun.altitudeDeg.toFixed(0)}°
+                    {!skyInfo.sun.visible && "（地平線下）"}
+                  </div>
+                  <div>
+                    ☾ 月: 方位 {skyInfo.moon.azimuthDeg.toFixed(0)}° / 高度{" "}
+                    {skyInfo.moon.altitudeDeg.toFixed(0)}°
+                    {!skyInfo.moon.visible && "（地平線下）"}
+                  </div>
+                  <div>
+                    月齢: 照度 {(skyInfo.moonFraction * 100).toFixed(0)}%（
+                    {skyInfo.moonWaxing ? "満ちる" : "欠ける"}）
+                  </div>
+                  <div>
+                    日の出 {fmtTime(skyInfo.sunrise)} / 日の入 {fmtTime(skyInfo.sunset)}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </section>
 
         {/* 事前保存（オフライン） */}
