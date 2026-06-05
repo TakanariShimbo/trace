@@ -30,3 +30,6 @@ __pycache__/
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright CLI artifacts
+.playwright-cli/
