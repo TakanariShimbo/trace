@@ -194,16 +194,8 @@ export class QuadtreeTerrain {
     fovScale: number,
   ): void {
     if (!frustum.intersectsBox(tile.box)) return; // 視錐台外＝描画しない（＝この領域は空ける）
-    // 円盤クリップ中は、円から十分外れたタイルだけロード/描画しない。
-    // 見える円の縁はシェーダ(ピクセル単位discard)が作るので、タイルカリングは余裕(×1.4)を
-    // 持たせて縁のタイルを常時保持する。これでズームで半径が変わっても縁が出し入れされず
-    // ちらつかない（外周の見えない部分は discard 済み）。
-    if (this.clip.on.value > 0.5) {
-      const c = this.clip.center.value;
-      const dx = Math.max(tile.box.min.x - c.x, 0, c.x - tile.box.max.x);
-      const dz = Math.max(tile.box.min.z - c.y, 0, c.y - tile.box.max.z);
-      if (Math.hypot(dx, dz) > this.clip.radius.value * 1.4) return;
-    }
+    // 円盤クリップ中もタイルのロード/LODは通常と一切変えない（タイル単位カリングはしない）。
+    // 円の見た目はマテリアル側のピクセル単位 discard だけで作る → 太陽月の有無で地形挙動は同一。
     tile.lastUsedFrame = this.frame;
 
     const wantRefine = tile.z < MAX_ZOOM && this.screenPx(tile, camPos, fovScale) > SPLIT_PX;
