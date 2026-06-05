@@ -13,6 +13,7 @@ import {
   IconHome,
   IconPlus,
   IconMinus,
+  IconLocate,
 } from "./icons";
 import {
   worldToLonLat,
@@ -84,6 +85,8 @@ export default function MapView() {
   const [searchMode, setSearchMode] = useState<SearchMode>("both");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false); // 現在地取得中
+  const [locError, setLocError] = useState<string | null>(null);
   // サイドバー開閉と、右下リモコンの表示。
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showRemote, setShowRemote] = useState(true);
@@ -453,6 +456,34 @@ export default function MapView() {
     setSidebarOpen(false); // 飛んだ先の地図が見えるよう閉じる
   };
 
+  // --- 現在地へ移動（GPS） --- //
+  const goToCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocError("この端末では現在地を取得できません");
+      return;
+    }
+    setLocError(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        apiRef.current?.flyTo({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setSidebarOpen(false);
+      },
+      (err) => {
+        setLocating(false);
+        setLocError(
+          err.code === err.PERMISSION_DENIED
+            ? "位置情報の利用が許可されていません"
+            : err.code === err.TIMEOUT
+              ? "現在地の取得がタイムアウトしました"
+              : "現在地を取得できませんでした",
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
   // --- 太陽・月操作 --- //
   const toggleCelestial = (on: boolean) => {
     setCelestialOn(on);
@@ -559,6 +590,12 @@ export default function MapView() {
               )}
             </button>
           </form>
+
+          <button className="save-btn" onClick={goToCurrentLocation} disabled={locating}>
+            {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={16} />}
+            {locating ? "取得中…" : "現在地へ移動"}
+          </button>
+          {locError && <div className="save-warn">{locError}</div>}
           {results.length > 0 && (
             <ul className="search-results">
               {results.map((r, i) => (

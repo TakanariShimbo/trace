@@ -112,3 +112,17 @@ export function IconMinus({ size = 18, className }: Props) {
     </svg>
   );
 }
+
+/** 現在地（GPSロケート）。十字＋中心の的。 */
+export function IconLocate({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+      <path d="M12 1 L12 4" />
+      <path d="M12 20 L12 23" />
+      <path d="M1 12 L4 12" />
+      <path d="M20 12 L23 12" />
+    </svg>
+  );
+}

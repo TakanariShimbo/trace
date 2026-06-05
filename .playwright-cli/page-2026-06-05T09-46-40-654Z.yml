@@ -1,0 +1,86 @@
+- generic [ref=e3]:
+  - img
+  - button "メニュー" [ref=e6] [cursor=pointer]: ☰
+  - complementary [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: GSI 3D Map
+      - button "×" [ref=e10] [cursor=pointer]
+    - generic [ref=e11]:
+      - heading "検索" [level=3] [ref=e12]
+      - generic [ref=e13]:
+        - button "山名" [ref=e14] [cursor=pointer]
+        - button "土地名" [ref=e15] [cursor=pointer]
+        - button "両方" [ref=e16] [cursor=pointer]
+      - generic [ref=e17]:
+        - 'searchbox "山名・地名で検索（例: 富士山）" [ref=e18]'
+        - button "検索" [ref=e19] [cursor=pointer]:
+          - img [ref=e20]
+      - button "現在地へ移動" [ref=e23] [cursor=pointer]:
+        - img [ref=e104]
+        - text: 現在地へ移動
+    - generic [ref=e27]:
+      - heading "地図" [level=3] [ref=e28]
+      - generic [ref=e29]:
+        - button "航空写真" [ref=e30] [cursor=pointer]
+        - button "標準地図" [ref=e31] [cursor=pointer]
+        - button "淡色地図" [ref=e32] [cursor=pointer]
+        - button "陰影起伏" [ref=e33] [cursor=pointer]
+    - generic [ref=e34]:
+      - heading "表示" [level=3] [ref=e35]
+      - generic [ref=e36] [cursor=pointer]:
+        - checkbox "操作リモコンを表示（右下）" [checked] [ref=e37]
+        - generic [ref=e38]: 操作リモコンを表示（右下）
+      - generic [ref=e39] [cursor=pointer]:
+        - checkbox "中心マーカーを表示" [checked] [ref=e40]
+        - generic [ref=e41]: 中心マーカーを表示
+    - generic [ref=e42]:
+      - heading "太陽・月" [level=3] [ref=e43]
+      - generic [ref=e44] [cursor=pointer]:
+        - checkbox "太陽・月を表示" [ref=e45]
+        - generic [ref=e46]: 太陽・月を表示
+    - generic [ref=e47]:
+      - heading "事前保存（オフライン）" [level=3] [ref=e48]
+      - paragraph [ref=e49]: 画面中央（見ている地点）を中心に、指定した半径・詳細度ぶんを保存します。 保存後は通信なしでもその範囲を3D表示できます。
+      - button "画面中央を中心地点にする" [ref=e50] [cursor=pointer]
+      - generic [ref=e51]:
+        - generic [ref=e52]: "半径: 8 km"
+        - 'slider "半径: 8 km" [ref=e53]': "8"
+      - generic [ref=e54]:
+        - generic [ref=e55]: "最大ズーム（詳細度）: z14"
+        - 'slider "最大ズーム（詳細度）: z14" [ref=e56]': "14"
+      - button "ダウンロード" [disabled] [ref=e58]:
+        - img [ref=e59]
+        - text: ダウンロード
+      - generic [ref=e61]:
+        - generic [ref=e62]: "保存済み: 2.5 MB"
+        - button "キャッシュを削除" [ref=e63] [cursor=pointer]
+  - generic [ref=e64]:
+    - generic [ref=e65]:
+      - button "水平に近づける" [ref=e66] [cursor=pointer]
+      - button "見下ろす" [ref=e68] [cursor=pointer]
+    - generic [ref=e70]:
+      - button "左に回す" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+      - button "右に回す" [ref=e75] [cursor=pointer]:
+        - img [ref=e76]
+    - generic [ref=e79]:
+      - button "前へ" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+      - button "左へ" [ref=e83] [cursor=pointer]:
+        - img [ref=e84]
+      - button "日本全体に戻す" [ref=e86] [cursor=pointer]:
+        - img [ref=e87]
+      - button "右へ" [ref=e90] [cursor=pointer]:
+        - img [ref=e91]
+      - button "後ろへ" [ref=e93] [cursor=pointer]:
+        - img [ref=e94]
+    - generic [ref=e96]:
+      - button "ズームイン" [ref=e97] [cursor=pointer]:
+        - img [ref=e98]
+      - button "ズームアウト" [ref=e99] [cursor=pointer]:
+        - img [ref=e100]
+  - generic [ref=e101]:
+    - text: "出典:"
+    - link "地理院タイル" [ref=e102] [cursor=pointer]:
+      - /url: https://maps.gsi.go.jp/development/ichiran.html
+    - text: （国土地理院）を加工して表示
