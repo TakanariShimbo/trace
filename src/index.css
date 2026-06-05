@@ -136,15 +136,42 @@ body,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 0;
+  padding: 8px 0;
   border-top: 1px solid rgba(130, 150, 175, 0.16);
 }
-.side-sec h3 {
-  margin: 0;
+/* 折りたたみ時はヘッダ以外を隠す（中身はアンマウントしないので状態は保持）。 */
+.side-sec.is-collapsed > *:not(.side-sec-head) {
+  display: none;
+}
+.side-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 2px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: #8fa2bb;
+  color: #9fb0c4;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.side-sec-head:hover {
+  color: #cdd9e8;
+}
+/* 開閉シェブロン（閉=右向き / 開=下向き）。 */
+.side-chev {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  margin-right: 3px;
+}
+.side-chev.is-open {
+  transform: rotate(45deg);
 }
 .side-toggle {
   display: flex;

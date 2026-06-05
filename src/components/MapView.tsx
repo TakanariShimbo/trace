@@ -94,6 +94,16 @@ export default function MapView() {
   const [showRemote, setShowRemote] = useState(true);
   // 中心マーカー（視点中心＝画面中央の目印）。画面中央のレティクルで表示する。
   const [showCenter, setShowCenter] = useState(true);
+  // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
+  const [openSec, setOpenSec] = useState<Record<string, boolean>>({
+    search: true,
+    map: true,
+    view: false,
+    sun: false,
+    save: false,
+  });
+  const toggleSec = (id: string) => setOpenSec((s) => ({ ...s, [id]: !s[id] }));
+  const secClass = (id: string) => `side-sec${openSec[id] ? "" : " is-collapsed"}`;
 
   // --- 太陽・月 --- //
   const [celestialOn, setCelestialOn] = useState(false);
@@ -523,6 +533,13 @@ export default function MapView() {
     `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
   const offLabel = `${offsetMin >= 0 ? "+" : "−"}${Math.floor(Math.abs(offsetMin) / 60)}:${pad2(Math.abs(offsetMin) % 60)}`;
 
+  const secHead = (id: string, title: string) => (
+    <button className="side-sec-head" onClick={() => toggleSec(id)} aria-expanded={openSec[id]}>
+      <span>{title}</span>
+      <span className={`side-chev${openSec[id] ? " is-open" : ""}`} />
+    </button>
+  );
+
   const SEARCH_MODES: { id: SearchMode; label: string }[] = [
     { id: "mountain", label: "山名" },
     { id: "place", label: "土地名" },
@@ -568,8 +585,8 @@ export default function MapView() {
         </div>
 
         {/* 検索 */}
-        <section className="side-sec">
-          <h3>検索</h3>
+        <section className={secClass("search")}>
+          {secHead("search", "検索")}
           <div className="search-modes">
             {SEARCH_MODES.map((m) => (
               <button
@@ -642,8 +659,8 @@ export default function MapView() {
         </section>
 
         {/* 地図（ベースマップ） */}
-        <section className="side-sec">
-          <h3>地図</h3>
+        <section className={secClass("map")}>
+          {secHead("map", "地図")}
           <div className="basemap-switch">
             {BASEMAPS.map((b) => (
               <button
@@ -658,8 +675,8 @@ export default function MapView() {
         </section>
 
         {/* 表示 */}
-        <section className="side-sec">
-          <h3>表示</h3>
+        <section className={secClass("view")}>
+          {secHead("view", "表示")}
           <label className="side-toggle">
             <input
               type="checkbox"
@@ -679,8 +696,8 @@ export default function MapView() {
         </section>
 
         {/* 太陽・月 */}
-        <section className="side-sec">
-          <h3>太陽・月</h3>
+        <section className={secClass("sun")}>
+          {secHead("sun", "太陽・月")}
           <label className="side-toggle">
             <input
               type="checkbox"
@@ -744,8 +761,8 @@ export default function MapView() {
         </section>
 
         {/* 事前保存（オフライン） */}
-        <section className="side-sec">
-          <h3>事前保存（オフライン）</h3>
+        <section className={secClass("save")}>
+          {secHead("save", "事前保存（オフライン）")}
           <p className="save-note">
             画面中央（見ている地点）を中心に、指定した半径・詳細度ぶんを保存します。
             保存後は通信なしでもその範囲を3D表示できます。
