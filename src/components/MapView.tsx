@@ -64,12 +64,6 @@ const RADIUS_MIN = 1;
 const RADIUS_MAX = 50;
 const RADIUS_DEFAULT = 8;
 
-// Date → <input type="date"> 用のローカル日付文字列 (YYYY-MM-DD)。
-function toDateInput(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
 export default function MapView() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   // 画面ボタンとレンダリングループで共有する操作状態（.current は callback/effect 内でのみ触る）。
@@ -97,16 +91,13 @@ export default function MapView() {
   // --- 太陽・月 --- //
   const [celestialOn, setCelestialOn] = useState(false);
   const [sunObserver, setSunObserver] = useState<LonLat | null>(null);
-  const [dateStr, setDateStr] = useState(() => toDateInput(new Date()));
-  const [minutes, setMinutes] = useState(() => {
-    const d = new Date();
-    return d.getHours() * 60 + d.getMinutes();
-  });
-  // 日付＋時刻スライダーから観測日時を合成。
-  const skyDate = useMemo(() => {
-    const [y, mo, da] = dateStr.split("-").map(Number);
-    return new Date(y, (mo || 1) - 1, da || 1, Math.floor(minutes / 60), minutes % 60);
-  }, [dateStr, minutes]);
+  // 現在時刻を中心(0)に、±12時間のオフセットで観測日時を作る。
+  const [baseTime, setBaseTime] = useState(() => new Date());
+  const [offsetMin, setOffsetMin] = useState(0);
+  const skyDate = useMemo(
+    () => new Date(baseTime.getTime() + offsetMin * 60000),
+    [baseTime, offsetMin],
+  );
   // 観測点＋日時から太陽月の状態（UI表示＆レイヤ反映に使う）。
   const skyInfo = useMemo<SkyState | null>(
     () => (celestialOn && sunObserver ? computeSky(skyDate, sunObserver.lat, sunObserver.lon) : null),
@@ -464,13 +455,14 @@ export default function MapView() {
     if (on && !sunObserver) setSunObserver(apiRef.current?.getCenter() ?? null);
   };
   const setSunNow = () => {
-    const d = new Date();
-    setDateStr(toDateInput(d));
-    setMinutes(d.getHours() * 60 + d.getMinutes());
+    setBaseTime(new Date());
+    setOffsetMin(0);
   };
-  const hhmm = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-  const fmtTime = (d: Date | null) =>
-    d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "—";
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const fmtTime = (d: Date | null) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : "—");
+  const fmtDateTime = (d: Date) =>
+    `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const offLabel = `${offsetMin >= 0 ? "+" : "−"}${Math.floor(Math.abs(offsetMin) / 60)}:${pad2(Math.abs(offsetMin) % 60)}`;
 
   const SEARCH_MODES: { id: SearchMode; label: string }[] = [
     { id: "mountain", label: "山名" },
@@ -626,27 +618,19 @@ export default function MapView() {
               )}
 
               <label className="save-field">
-                <span>日付</span>
-                <input
-                  type="date"
-                  value={dateStr}
-                  onChange={(e) => setDateStr(e.target.value)}
-                />
-              </label>
-
-              <label className="save-field">
-                <span>時刻: {hhmm}</span>
+                <span>日時: {fmtDateTime(skyDate)}（現在 {offLabel}）</span>
                 <input
                   type="range"
-                  min={0}
-                  max={1439}
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
+                  min={-720}
+                  max={720}
+                  step={5}
+                  value={offsetMin}
+                  onChange={(e) => setOffsetMin(Number(e.target.value))}
                 />
               </label>
 
               <button className="save-link" onClick={setSunNow}>
-                現在の日時にする
+                現在時刻にリセット
               </button>
 
               {skyInfo && (
