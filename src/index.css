@@ -81,11 +81,11 @@ body,
   background: rgba(34, 46, 62, 0.85);
 }
 
-/* 視点フリー切替（メニューボタンの右） */
+/* 自由視点切替（右上） */
 .freelook-toggle {
   position: absolute;
   top: max(8px, env(safe-area-inset-top, 8px));
-  left: calc(max(8px, env(safe-area-inset-left, 8px)) + 50px);
+  right: max(8px, env(safe-area-inset-right, 8px));
   height: 42px;
   padding: 0 14px;
   font-size: 13px;

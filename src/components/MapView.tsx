@@ -622,13 +622,13 @@ export default function MapView() {
         ☰
       </button>
 
-      {/* 視点フリー（解像度・太陽月を凍結して視点だけ動かす。解除でモード前の視点へ戻る） */}
+      {/* 自由視点（解像度・太陽月を凍結して視点だけ動かす。解除でモード前の視点へ戻る） */}
       <button
         className={`freelook-toggle${freeLook ? " is-active" : ""}`}
-        title="視点フリー：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
+        title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
         onClick={toggleFreeLook}
       >
-        {freeLook ? "視点フリー：ON" : "視点フリー"}
+        {freeLook ? "自由視点：ON" : "自由視点"}
       </button>
 
       {/* サイドバー背景（タップで閉じる） */}

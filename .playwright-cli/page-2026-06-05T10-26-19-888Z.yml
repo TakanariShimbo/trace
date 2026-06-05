@@ -1,0 +1,66 @@
+- generic [ref=e3]:
+  - img
+  - button "メニュー" [ref=e6] [cursor=pointer]: ☰
+  - button "自由視点" [ref=e7] [cursor=pointer]
+  - complementary [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: GSI 3D Map
+      - button "×" [ref=e11] [cursor=pointer]
+    - generic [ref=e12]:
+      - button "検索" [expanded] [ref=e13] [cursor=pointer]:
+        - generic [ref=e14]: 検索
+      - generic [ref=e16]:
+        - button "山名" [ref=e17] [cursor=pointer]
+        - button "土地名" [ref=e18] [cursor=pointer]
+        - button "両方" [ref=e19] [cursor=pointer]
+      - generic [ref=e20]:
+        - 'searchbox "山名・地名で検索（例: 富士山）" [ref=e21]'
+        - button "検索" [ref=e22] [cursor=pointer]:
+          - img [ref=e23]
+      - button "現在地へ移動" [ref=e26] [cursor=pointer]:
+        - img [ref=e27]
+        - text: 現在地へ移動
+    - generic [ref=e30]:
+      - button "地図" [expanded] [ref=e31] [cursor=pointer]:
+        - generic [ref=e32]: 地図
+      - generic [ref=e34]:
+        - button "航空写真" [ref=e35] [cursor=pointer]
+        - button "標準地図" [ref=e36] [cursor=pointer]
+        - button "淡色地図" [ref=e37] [cursor=pointer]
+        - button "陰影起伏" [ref=e38] [cursor=pointer]
+    - button "表示" [ref=e40] [cursor=pointer]:
+      - generic [ref=e41]: 表示
+    - button "太陽・月" [ref=e44] [cursor=pointer]:
+      - generic [ref=e45]: 太陽・月
+    - button "事前保存（オフライン）" [ref=e48] [cursor=pointer]:
+      - generic [ref=e49]: 事前保存（オフライン）
+  - generic [ref=e51]:
+    - generic [ref=e52]:
+      - button "水平に近づける" [ref=e53] [cursor=pointer]
+      - button "見下ろす" [ref=e55] [cursor=pointer]
+    - generic [ref=e57]:
+      - button "左に回す" [ref=e58] [cursor=pointer]:
+        - img [ref=e59]
+      - button "右に回す" [ref=e62] [cursor=pointer]:
+        - img [ref=e63]
+    - generic [ref=e66]:
+      - button "前へ" [ref=e67] [cursor=pointer]:
+        - img [ref=e68]
+      - button "左へ" [ref=e70] [cursor=pointer]:
+        - img [ref=e71]
+      - button "ホーム（現在地）" [ref=e73] [cursor=pointer]:
+        - img [ref=e74]
+      - button "右へ" [ref=e77] [cursor=pointer]:
+        - img [ref=e78]
+      - button "後ろへ" [ref=e80] [cursor=pointer]:
+        - img [ref=e81]
+    - generic [ref=e83]:
+      - button "ズームイン" [ref=e84] [cursor=pointer]:
+        - img [ref=e85]
+      - button "ズームアウト" [ref=e86] [cursor=pointer]:
+        - img [ref=e87]
+  - generic [ref=e88]:
+    - text: "出典:"
+    - link "地理院タイル" [ref=e89] [cursor=pointer]:
+      - /url: https://maps.gsi.go.jp/development/ichiran.html
+    - text: （国土地理院）を加工して表示
