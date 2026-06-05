@@ -78,6 +78,8 @@ export default function MapView() {
     setCelestialActive: (on: boolean) => void;
     setCelestialSky: (sky: SkyState | null, sunTrack: SkyBody[], moonTrack: SkyBody[]) => void;
   } | null>(null);
+  // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
+  const homeLocRef = useRef<LonLat | null>(null);
 
   // --- ベースマップ・検索の状態 --- //
   const [basemapId, setBasemapId] = useState(BASEMAPS[0].id);
@@ -376,6 +378,20 @@ export default function MapView() {
     apiRef.current?.setBasemap(basemapById(basemapId));
   }, [basemapId]);
 
+  // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        homeLocRef.current = loc;
+        apiRef.current?.flyTo(loc);
+      },
+      () => undefined, // 失敗・拒否時は既定ビューのまま
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+    );
+  }, []);
+
   // 太陽・月: 観測点(=視点中心)＋日時から sky/軌跡を計算して反映。中心追従はループ側。
   useEffect(() => {
     const api = apiRef.current;
@@ -467,7 +483,9 @@ export default function MapView() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setLocating(false);
-        apiRef.current?.flyTo({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        homeLocRef.current = loc;
+        apiRef.current?.flyTo(loc);
         setSidebarOpen(false);
       },
       (err) => {
@@ -482,6 +500,12 @@ export default function MapView() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
+  };
+
+  // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
+  const goHome = () => {
+    if (homeLocRef.current) apiRef.current?.flyTo(homeLocRef.current);
+    else navRef.current.home = true;
   };
 
   // --- 太陽・月操作 --- //
@@ -841,13 +865,7 @@ export default function MapView() {
             <button className="nav-btn nav-left" title="左へ" {...hold({ panX: -1 }, "panX")}>
               <IconCaret dir="left" />
             </button>
-            <button
-              className="nav-btn nav-home"
-              title="日本全体に戻す"
-              onClick={() => {
-                navRef.current.home = true;
-              }}
-            >
+            <button className="nav-btn nav-home" title="ホーム（現在地）" onClick={goHome}>
               <IconHome />
             </button>
             <button className="nav-btn nav-right" title="右へ" {...hold({ panX: 1 }, "panX")}>
