@@ -1,0 +1,87 @@
+- generic [ref=e3]:
+  - generic:
+    - generic: tiles 16
+    - generic: load 0
+    - generic: queue 0
+    - generic: draw 16
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - button "山名" [ref=e8] [cursor=pointer]
+      - button "土地名" [ref=e9] [cursor=pointer]
+      - button "両方" [ref=e10] [cursor=pointer]
+    - generic [ref=e11]:
+      - 'searchbox "山名・地名で検索（例: 富士山）" [ref=e152]': 富士山
+      - button "🔍" [ref=e13] [cursor=pointer]
+    - list [ref=e39]:
+      - listitem [ref=e153]:
+        - button "⛰ 富士山 3776m ・ 山梨県/静岡県" [ref=e154] [cursor=pointer]:
+          - generic [ref=e155]: ⛰
+          - generic [ref=e156]: 富士山
+          - generic [ref=e157]: 3776m ・ 山梨県/静岡県
+      - listitem [ref=e158]:
+        - button "📍 山梨県鳴沢村富士山" [ref=e159] [cursor=pointer]:
+          - generic [ref=e160]: 📍
+          - generic [ref=e161]: 山梨県鳴沢村富士山
+      - listitem [ref=e162]:
+        - button "📍 長野県上田市富士山" [ref=e163] [cursor=pointer]:
+          - generic [ref=e164]: 📍
+          - generic [ref=e165]: 長野県上田市富士山
+      - listitem [ref=e166]:
+        - button "📍 愛知県犬山市富士山" [ref=e167] [cursor=pointer]:
+          - generic [ref=e168]: 📍
+          - generic [ref=e169]: 愛知県犬山市富士山
+      - listitem [ref=e170]:
+        - button "📍 富士山" [ref=e171] [cursor=pointer]:
+          - generic [ref=e172]: 📍
+          - generic [ref=e173]: 富士山
+      - listitem [ref=e174]:
+        - button "📍 小富士山" [ref=e175] [cursor=pointer]:
+          - generic [ref=e176]: 📍
+          - generic [ref=e177]: 小富士山
+      - listitem [ref=e178]:
+        - button "📍 小富士山" [ref=e179] [cursor=pointer]:
+          - generic [ref=e180]: 📍
+          - generic [ref=e181]: 小富士山
+      - listitem [ref=e182]:
+        - button "📍 小富士山" [ref=e183] [cursor=pointer]:
+          - generic [ref=e184]: 📍
+          - generic [ref=e185]: 小富士山
+      - listitem [ref=e186]:
+        - button "📍 小富士山" [ref=e187] [cursor=pointer]:
+          - generic [ref=e188]: 📍
+          - generic [ref=e189]: 小富士山
+      - listitem [ref=e190]:
+        - button "📍 富士山" [ref=e191] [cursor=pointer]:
+          - generic [ref=e192]: 📍
+          - generic [ref=e193]: 富士山
+      - listitem [ref=e194]:
+        - button "📍 真富士山" [ref=e195] [cursor=pointer]:
+          - generic [ref=e196]: 📍
+          - generic [ref=e197]: 真富士山
+      - listitem [ref=e198]:
+        - button "📍 富士山" [ref=e199] [cursor=pointer]:
+          - generic [ref=e200]: 📍
+          - generic [ref=e201]: 富士山
+  - button "⤓ 保存" [ref=e14] [cursor=pointer]
+  - generic [ref=e15]:
+    - button "航空写真" [ref=e16] [cursor=pointer]
+    - button "標準地図" [ref=e17] [cursor=pointer]
+    - button "淡色地図" [ref=e18] [cursor=pointer]
+    - button "陰影起伏" [ref=e19] [cursor=pointer]
+  - generic [ref=e20]:
+    - generic [ref=e21]:
+      - button "水平に近づける" [ref=e22] [cursor=pointer]
+      - button "見下ろす" [ref=e24] [cursor=pointer]
+    - generic [ref=e26]:
+      - button "↺" [ref=e27] [cursor=pointer]
+      - button "↻" [ref=e28] [cursor=pointer]
+    - generic [ref=e29]:
+      - button "▲" [ref=e30] [cursor=pointer]
+      - button "◀" [ref=e31] [cursor=pointer]
+      - button "⌂" [ref=e32] [cursor=pointer]
+      - button "▶" [ref=e33] [cursor=pointer]
+      - button "▼" [ref=e34] [cursor=pointer]
+    - generic [ref=e35]:
+      - button "＋" [ref=e36] [cursor=pointer]
+      - button "−" [ref=e37] [cursor=pointer]
+  - generic: "地図・航空写真・標高: 国土地理院（GSI）タイル"

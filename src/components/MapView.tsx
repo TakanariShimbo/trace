@@ -15,7 +15,7 @@ import {
   clearTileCaches,
   type Basemap,
 } from "../lib/basemaps";
-import { searchPlaces, type GeoResult } from "../lib/geocode";
+import { runSearch, type SearchMode, type SearchResult } from "../lib/search";
 import {
   planPrefetchDisk,
   runPrefetch,
@@ -68,7 +68,8 @@ export default function MapView() {
   // --- ベースマップ・検索の状態 --- //
   const [basemapId, setBasemapId] = useState(BASEMAPS[0].id);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<GeoResult[]>([]);
+  const [searchMode, setSearchMode] = useState<SearchMode>("both");
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
   // --- 事前ロード（オフライン保存）UI の状態 --- //
@@ -344,19 +345,35 @@ export default function MapView() {
   };
 
   // --- 検索 → フライト --- //
-  const doSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const runQuery = async (q: string, mode: SearchMode) => {
+    if (!q.trim()) {
+      setResults([]);
+      return;
+    }
     setSearching(true);
-    const r = await searchPlaces(query);
+    const r = await runSearch(q, mode);
     setSearching(false);
     setResults(r);
   };
-  const goToResult = (r: GeoResult) => {
+  const doSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runQuery(query, searchMode);
+  };
+  const changeMode = (mode: SearchMode) => {
+    setSearchMode(mode);
+    if (query.trim()) void runQuery(query, mode); // 入力済みなら即座に引き直す
+  };
+  const goToResult = (r: SearchResult) => {
     apiRef.current?.flyTo({ lat: r.lat, lon: r.lon });
     setResults([]);
     setQuery(r.title);
   };
+
+  const SEARCH_MODES: { id: SearchMode; label: string }[] = [
+    { id: "mountain", label: "山名" },
+    { id: "place", label: "土地名" },
+    { id: "both", label: "両方" },
+  ];
 
   const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
@@ -372,13 +389,30 @@ export default function MapView() {
         </div>
       )}
 
-      {/* 地名・山名検索 → フライト（上中央） */}
+      {/* 山名・土地名検索 → フライト（上中央） */}
       <div className="search">
+        <div className="search-modes">
+          {SEARCH_MODES.map((m) => (
+            <button
+              key={m.id}
+              className={m.id === searchMode ? "is-active" : ""}
+              onClick={() => changeMode(m.id)}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
         <form className="search-bar" onSubmit={doSearch}>
           <input
             type="search"
             value={query}
-            placeholder="地名・山名で検索（例: 富士山）"
+            placeholder={
+              searchMode === "mountain"
+                ? "山名で検索（例: 槍ヶ岳）"
+                : searchMode === "place"
+                  ? "地名で検索（例: 上高地）"
+                  : "山名・地名で検索（例: 富士山）"
+            }
             onChange={(e) => setQuery(e.target.value)}
           />
           <button type="submit" title="検索" disabled={searching}>
@@ -388,8 +422,16 @@ export default function MapView() {
         {results.length > 0 && (
           <ul className="search-results">
             {results.map((r, i) => (
-              <li key={`${r.lat},${r.lon},${i}`}>
-                <button onClick={() => goToResult(r)}>{r.title}</button>
+              <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
+                <button onClick={() => goToResult(r)}>
+                  <span className="res-ico">{r.kind === "mountain" ? "⛰" : "📍"}</span>
+                  <span className="res-title">{r.title}</span>
+                  {r.kind === "mountain" && (
+                    <span className="res-sub">
+                      {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
+                    </span>
+                  )}
+                </button>
               </li>
             ))}
           </ul>

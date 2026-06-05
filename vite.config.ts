@@ -39,11 +39,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // アプリ本体（シェル）をプリキャッシュしてオフライン起動可能にする。
-        // GSIタイルは demTiles/aerialTiles が独自に Cache API で扱うのでここには含めない。
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest}"],
+        // アプリ本体（シェル）＋山岳データ(mountains.json)をプリキャッシュしオフライン起動可能に。
+        // GSIタイルは demTiles/basemaps が独自に Cache API で扱うのでここには含めない。
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,json}"],
         navigateFallback: "index.html",
-        // 地形データのキャッシュが大きくなり得るため SW のクリーンアップは既定のまま。
       },
       devOptions: { enabled: false },
     }),
