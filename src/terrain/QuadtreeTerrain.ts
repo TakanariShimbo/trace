@@ -18,6 +18,7 @@ import {
   mercYToWorld,
   elevToWorldY,
   lonLatToTile,
+  JAPAN_BBOX,
 } from "../lib/mercator";
 import { sampleTile } from "../workers/terrainClient";
 import { fetchAerialTile, AERIAL_MAX_Z } from "../lib/aerialTiles";
@@ -34,8 +35,7 @@ const ELEV_MIN_GUESS = -50; // 未ロード時のAABB下限(m)
 const ELEV_MAX_GUESS = 4000; // 未ロード時のAABB上限(m, 富士山+余裕)
 const OCEAN_COLOR = 0x12304a;
 
-// 日本の概略 bbox（小笠原などは除外）。
-const JP = { latMin: 20, latMax: 46, lonMin: 122, lonMax: 154 };
+const JP = JAPAN_BBOX;
 
 type TileState = "empty" | "loading" | "ready" | "failed";
 

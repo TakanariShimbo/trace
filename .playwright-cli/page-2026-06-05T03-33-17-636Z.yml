@@ -1,0 +1,37 @@
+- generic [ref=e3]:
+  - generic:
+    - generic: tiles 101
+    - generic: load 0
+    - generic: queue 0
+    - generic: draw 52
+  - button "⤓ 保存" [active] [ref=e6] [cursor=pointer]
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - button "水平に近づける" [ref=e9] [cursor=pointer]
+      - button "見下ろす" [ref=e11] [cursor=pointer]
+    - generic [ref=e13]:
+      - button "↺" [ref=e14] [cursor=pointer]
+      - button "↻" [ref=e15] [cursor=pointer]
+    - generic [ref=e16]:
+      - button "▲" [ref=e17] [cursor=pointer]
+      - button "◀" [ref=e18] [cursor=pointer]
+      - button "⌂" [ref=e19] [cursor=pointer]
+      - button "▶" [ref=e20] [cursor=pointer]
+      - button "▼" [ref=e21] [cursor=pointer]
+    - generic [ref=e22]:
+      - button "＋" [ref=e23] [cursor=pointer]
+      - button "−" [ref=e24] [cursor=pointer]
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]: オフライン保存
+      - button "×" [ref=e28] [cursor=pointer]
+    - paragraph [ref=e29]: いま画面に写っている範囲を、選んだ詳細度までダウンロードして保存します。 保存後は通信なしでもその範囲を3D表示できます。
+    - generic [ref=e30]:
+      - generic [ref=e31]: "最大ズーム（詳細度）: z14"
+      - 'slider "最大ズーム（詳細度）: z14" [ref=e32]': "14"
+    - button "現在の表示範囲を対象にする" [ref=e33] [cursor=pointer]
+    - button "ダウンロード" [disabled] [ref=e35]
+    - generic [ref=e36]:
+      - generic [ref=e37]: "保存済み: 78.8 MB"
+      - button "キャッシュを削除" [ref=e38] [cursor=pointer]
+  - generic: "地図・航空写真・標高: 国土地理院（GSI）タイル"

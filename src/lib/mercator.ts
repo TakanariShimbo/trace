@@ -22,6 +22,9 @@ export const ORIGIN_LON = 137.5;
 // 標高の強調倍率。1=実スケール。広域では山が潰れて見えるので既定で少し強調する。
 export const VERTICAL_EXAGGERATION = 1.7;
 
+// 日本の概略 bbox（ルートタイル・事前ロード範囲のクランプに使う。小笠原などは除外）。
+export const JAPAN_BBOX = { latMin: 20, latMax: 46, lonMin: 122, lonMax: 154 };
+
 function lonToMercX(lon: number): number {
   return (lon * Math.PI) / 180 * MERC_R;
 }
@@ -57,6 +60,13 @@ export function mercYToWorld(my: number): number {
 /** 標高(m) → ワールドY（上+、VEX反映）。 */
 export function elevToWorldY(elevM: number): number {
   return elevM * ELEV_SCALE;
+}
+
+/** ワールド水平座標(X=東, Z=南) → 経緯度（mercYToWorld の逆。事前ロード範囲の算出に使う）。 */
+export function worldToLonLat(wx: number, wz: number): { lat: number; lon: number } {
+  const mx = wx / WORLD_SCALE + ORIGIN_MX;
+  const my = -wz / WORLD_SCALE + ORIGIN_MY;
+  return { lat: mercYToLat(my), lon: mercXToLon(mx) };
 }
 
 export type TileId = { z: number; x: number; y: number };

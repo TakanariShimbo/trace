@@ -95,3 +95,31 @@ async function loadDemTile(z: number, x: number, y: number, key: string): Promis
   }
   return grid;
 }
+
+/**
+ * 事前ロード用: DEMタイルの生テキストを Cache API に確保する（パースしない＝メモリを汚さない）。
+ * すでにキャッシュ済みなら何もしない。戻り値は「キャッシュに存在する状態になったか」。
+ */
+export async function prefetchDemTile(z: number, x: number, y: number): Promise<boolean> {
+  const url = DEM_TILE_URL.replace("{z}", String(z))
+    .replace("{x}", String(x))
+    .replace("{y}", String(y));
+  let cache: Cache | null;
+  try {
+    cache = typeof caches !== "undefined" ? await caches.open(TILE_CACHE_NAME) : null;
+  } catch {
+    cache = null;
+  }
+  if (cache && (await cache.match(url))) return true;
+  let res: Response;
+  try {
+    res = await fetch(url, { mode: "cors" });
+  } catch {
+    return false;
+  }
+  if (res.status === 404) return true; // 海域＝DEM無し。落とすものが無いので成功扱い。
+  if (!res.ok) return false;
+  const text = await res.text();
+  if (cache) await cache.put(url, new Response(text, { headers: { "content-type": "text/plain" } }));
+  return true;
+}

@@ -1,10 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { QuadtreeTerrain, type TerrainStats } from "../terrain/QuadtreeTerrain";
+import { worldToLonLat } from "../lib/mercator";
+import { clearTileCaches } from "../lib/aerialTiles";
+import {
+  planPrefetch,
+  runPrefetch,
+  formatBytes,
+  type BBox,
+  type PrefetchProgress,
+} from "../lib/prefetch";
 
 // 3Dビュー本体。Three.js のセットアップ、地図的なカメラ操作（MapControls＋画面ボタン）、
-// 毎フレームのクアッドツリー更新を行う。月/太陽/カメラFOVなどは持たない単機能。
+// 毎フレームのクアッドツリー更新、そして事前ロード（オフライン保存）UI を持つ。
 
 // 画面ボタンで保持する操作状態（押している間 1/-1、毎フレーム適用）。
 type Nav = {
@@ -15,21 +24,38 @@ type Nav = {
   dolly: number;
   home: boolean;
 };
-
-// nav の数値フィールド（押下解除でゼロに戻す対象）。
 type NavNumKey = "panX" | "panZ" | "orbit" | "tilt" | "dolly";
 
 // 1フレームあたりの操作量。
-const PAN_SPEED = 0.015; // 注視点までの距離に対する割合
-const ORBIT_SPEED = 0.025; // rad
-const TILT_SPEED = 0.022; // rad
-const DOLLY_BASE = 1.04; // 倍率
+const PAN_SPEED = 0.015;
+const ORBIT_SPEED = 0.025;
+const TILT_SPEED = 0.022;
+const DOLLY_BASE = 1.04;
+
+// 事前ロードで選べる最大ズーム（DEMは z14 まで、航空写真はそれ以上も高精細化）。
+const PREFETCH_Z_MIN = 12;
+const PREFETCH_Z_MAX = 16;
+const PREFETCH_Z_DEFAULT = 14;
 
 export default function MapView() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [stats, setStats] = useState<TerrainStats | null>(null);
   // 画面ボタンとレンダリングループで共有する操作状態（.current は callback/effect 内でのみ触る）。
   const navRef = useRef<Nav>({ panX: 0, panZ: 0, orbit: 0, tilt: 0, dolly: 0, home: false });
+  // effect 内で作る「現在の表示範囲を返す」関数の橋渡し。
+  const apiRef = useRef<{ getViewBounds: () => BBox | null } | null>(null);
+
+  // --- 事前ロード（オフライン保存）UI の状態 --- //
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [maxZ, setMaxZ] = useState(PREFETCH_Z_DEFAULT);
+  const [bbox, setBbox] = useState<BBox | null>(null);
+  const [progress, setProgress] = useState<PrefetchProgress | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [storageUsage, setStorageUsage] = useState<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // 選択中の範囲＋詳細度からダウンロード計画（タイル数・サイズ目安）を作る。
+  const plan = useMemo(() => (bbox ? planPrefetch(bbox, maxZ) : null), [bbox, maxZ]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -46,7 +72,7 @@ export default function MapView() {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0d12);
-    scene.fog = new THREE.Fog(0x0a0d12, 2000, 7000); // 遠景をなじませる
+    scene.fog = new THREE.Fog(0x0a0d12, 2000, 7000);
 
     const camera = new THREE.PerspectiveCamera(
       55,
@@ -54,16 +80,15 @@ export default function MapView() {
       0.05,
       9000,
     );
-    // 起動時は日本全体を斜め上空から見下ろす。
     camera.position.set(0, 2200, 2600);
 
     const controls = new MapControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.screenSpacePanning = false; // 地面(XZ平面)に沿ってパン
+    controls.screenSpacePanning = false;
     controls.minDistance = 0.3;
     controls.maxDistance = 6000;
-    controls.maxPolarAngle = THREE.MathUtils.degToRad(85); // 地平より下に潜らない
+    controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
     controls.target.set(0, 0, 0);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.85));
@@ -73,6 +98,47 @@ export default function MapView() {
 
     const terrain = new QuadtreeTerrain(renderer);
     scene.add(terrain.group);
+
+    // --- 現在の表示範囲(bbox)を、画面四隅のレイを地表(y=0)へ落として求める --- //
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const ray = new THREE.Raycaster();
+    const getViewBounds = (): BBox | null => {
+      const camDist = camera.position.distanceTo(controls.target);
+      // 地平を向くレイが無限遠へ飛ぶのを防ぐ、地表での最大到達半径(ワールドkm)。
+      const maxR = Math.min(1500, camDist * 3 + 20);
+      const corners: [number, number][] = [
+        [-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0],
+      ];
+      let latMin = Infinity, latMax = -Infinity, lonMin = Infinity, lonMax = -Infinity;
+      for (const [nx, ny] of corners) {
+        ray.setFromCamera(new THREE.Vector2(nx, ny), camera);
+        const hit = new THREE.Vector3();
+        const ok = ray.ray.intersectPlane(groundPlane, hit);
+        let p: THREE.Vector3;
+        if (ok && hit.distanceTo(camera.position) <= maxR * 1.2) {
+          p = hit;
+        } else {
+          p = camera.position.clone().addScaledVector(ray.ray.direction, maxR);
+          p.y = 0;
+        }
+        // 注視点からの距離を maxR で頭打ちにして範囲を有界化。
+        const dx = p.x - controls.target.x;
+        const dz = p.z - controls.target.z;
+        const d = Math.hypot(dx, dz);
+        if (d > maxR) {
+          p.x = controls.target.x + (dx * maxR) / d;
+          p.z = controls.target.z + (dz * maxR) / d;
+        }
+        const { lat, lon } = worldToLonLat(p.x, p.z);
+        latMin = Math.min(latMin, lat);
+        latMax = Math.max(latMax, lat);
+        lonMin = Math.min(lonMin, lon);
+        lonMax = Math.max(lonMax, lon);
+      }
+      if (!Number.isFinite(latMin)) return null;
+      return { latMin, latMax, lonMin, lonMax };
+    };
+    apiRef.current = { getViewBounds };
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
     const UP = new THREE.Vector3(0, 1, 0);
@@ -87,9 +153,8 @@ export default function MapView() {
           controls.target.copy(initTarget);
           nav.home = false;
         }
-        return; // 復帰アニメ中は他操作を無視
+        return;
       }
-      // ズーム（注視点に寄る/離れる）。
       if (nav.dolly) {
         const offset = camera.position.clone().sub(controls.target);
         const factor = nav.dolly > 0 ? 1 / DOLLY_BASE : DOLLY_BASE;
@@ -100,13 +165,11 @@ export default function MapView() {
         );
         camera.position.copy(controls.target).add(offset.setLength(d));
       }
-      // 回転（注視点まわりに方位を回す）。
       if (nav.orbit) {
         const offset = camera.position.clone().sub(controls.target);
         offset.applyAxisAngle(UP, ORBIT_SPEED * nav.orbit);
         camera.position.copy(controls.target).add(offset);
       }
-      // 傾き（俯角＝極角を変える）。
       if (nav.tilt) {
         const offset = camera.position.clone().sub(controls.target);
         const r = offset.length();
@@ -117,7 +180,6 @@ export default function MapView() {
         offset.set(r * sp * Math.sin(az), r * Math.cos(polar), r * sp * Math.cos(az));
         camera.position.copy(controls.target).add(offset);
       }
-      // パン（視線方向＝前後、右方向＝左右に地面を平行移動）。
       if (nav.panX || nav.panZ) {
         const step = camera.position.distanceTo(controls.target) * PAN_SPEED;
         const forward = new THREE.Vector3();
@@ -161,6 +223,7 @@ export default function MapView() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       ro.disconnect();
+      apiRef.current = null;
       controls.dispose();
       terrain.dispose();
       renderer.dispose();
@@ -168,7 +231,7 @@ export default function MapView() {
     };
   }, []);
 
-  // ボタンのプレス/リリース（押下中だけ nav を立てる）。
+  // --- 画面ボタンのプレス/リリース --- //
   const start = (patch: Partial<Nav>) => (e: React.PointerEvent) => {
     e.preventDefault();
     Object.assign(navRef.current, patch);
@@ -183,6 +246,37 @@ export default function MapView() {
     onPointerCancel: stop(...keys),
   });
 
+  // --- 事前ロード操作 --- //
+  const refreshStorage = () => {
+    navigator.storage?.estimate?.().then((e) => setStorageUsage(e.usage ?? 0));
+  };
+  const openPanel = () => {
+    setPanelOpen(true);
+    refreshStorage();
+  };
+  const captureView = () => {
+    setBbox(apiRef.current?.getViewBounds() ?? null);
+  };
+  const startDownload = async () => {
+    if (!plan || plan.jobs.length === 0) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setDownloading(true);
+    setProgress({ done: 0, total: plan.jobs.length, failed: 0 });
+    await runPrefetch(plan, setProgress, controller.signal);
+    setDownloading(false);
+    abortRef.current = null;
+    refreshStorage();
+  };
+  const cancelDownload = () => abortRef.current?.abort();
+  const clearCache = async () => {
+    await clearTileCaches();
+    setProgress(null);
+    refreshStorage();
+  };
+
+  const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+
   return (
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
@@ -195,8 +289,13 @@ export default function MapView() {
         </div>
       )}
 
+      {/* オフライン保存パネルを開くボタン（右上） */}
+      <button className="save-open" title="オフライン保存（事前ロード）" onClick={openPanel}>
+        ⤓ 保存
+      </button>
+
+      {/* カメラ操作ボタン（右下） */}
       <div className="nav-controls">
-        {/* 傾き */}
         <div className="nav-row">
           <button className="nav-btn" title="水平に近づける" {...hold({ tilt: 1 }, "tilt")}>
             <span className="nav-ico nav-ico--tilt-up" />
@@ -205,12 +304,10 @@ export default function MapView() {
             <span className="nav-ico nav-ico--tilt-down" />
           </button>
         </div>
-        {/* 回転 */}
         <div className="nav-row">
           <button className="nav-btn" title="左に回す" {...hold({ orbit: 1 }, "orbit")}>↺</button>
           <button className="nav-btn" title="右に回す" {...hold({ orbit: -1 }, "orbit")}>↻</button>
         </div>
-        {/* パン（十字）＋中央ホーム */}
         <div className="nav-pad">
           <button className="nav-btn nav-up" title="前へ" {...hold({ panZ: 1 }, "panZ")}>▲</button>
           <button className="nav-btn nav-left" title="左へ" {...hold({ panX: -1 }, "panX")}>◀</button>
@@ -226,12 +323,93 @@ export default function MapView() {
           <button className="nav-btn nav-right" title="右へ" {...hold({ panX: 1 }, "panX")}>▶</button>
           <button className="nav-btn nav-down" title="後ろへ" {...hold({ panZ: -1 }, "panZ")}>▼</button>
         </div>
-        {/* ズーム */}
         <div className="nav-zoom">
           <button className="nav-btn" title="ズームイン" {...hold({ dolly: 1 }, "dolly")}>＋</button>
           <button className="nav-btn" title="ズームアウト" {...hold({ dolly: -1 }, "dolly")}>−</button>
         </div>
       </div>
+
+      {/* オフライン保存パネル */}
+      {panelOpen && (
+        <div className="save-panel">
+          <div className="save-head">
+            <span>オフライン保存</span>
+            <button className="save-close" title="閉じる" onClick={() => setPanelOpen(false)}>×</button>
+          </div>
+
+          <p className="save-note">
+            いま画面に写っている範囲を、選んだ詳細度までダウンロードして保存します。
+            保存後は通信なしでもその範囲を3D表示できます。
+          </p>
+
+          <label className="save-field">
+            <span>最大ズーム（詳細度）: z{maxZ}{maxZ > 14 ? "（標高は z14 まで）" : ""}</span>
+            <input
+              type="range"
+              min={PREFETCH_Z_MIN}
+              max={PREFETCH_Z_MAX}
+              value={maxZ}
+              disabled={downloading}
+              onChange={(e) => setMaxZ(Number(e.target.value))}
+            />
+          </label>
+
+          <button className="save-btn" onClick={captureView} disabled={downloading}>
+            現在の表示範囲を対象にする
+          </button>
+
+          {plan && (
+            <div className="save-plan">
+              {plan.jobs.length === 0 ? (
+                <span className="save-warn">この範囲は日本の範囲外です。</span>
+              ) : (
+                <>
+                  <div>
+                    タイル数: <b>{plan.jobs.length.toLocaleString()}</b>（航空写真 {plan.aerialCount.toLocaleString()} ＋ 標高 {plan.demCount.toLocaleString()}）
+                  </div>
+                  <div>サイズ目安: 約 {formatBytes(plan.estBytes)}</div>
+                  {plan.truncated && (
+                    <div className="save-warn">範囲が広すぎるため上限で打ち切りました。ズームインして範囲を絞ってください。</div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {downloading && progress && (
+            <div className="save-progress">
+              <div className="save-bar">
+                <div className="save-bar-fill" style={{ width: `${pct}%` }} />
+              </div>
+              <div className="save-prog-text">
+                {progress.done.toLocaleString()} / {progress.total.toLocaleString()}（{pct}%）
+                {progress.failed > 0 && ` ／ 失敗 ${progress.failed}`}
+              </div>
+            </div>
+          )}
+
+          <div className="save-actions">
+            {downloading ? (
+              <button className="save-btn save-btn--danger" onClick={cancelDownload}>中止</button>
+            ) : (
+              <button
+                className="save-btn save-btn--primary"
+                onClick={startDownload}
+                disabled={!plan || plan.jobs.length === 0}
+              >
+                ダウンロード
+              </button>
+            )}
+          </div>
+
+          <div className="save-storage">
+            <span>保存済み: {storageUsage == null ? "—" : formatBytes(storageUsage)}</span>
+            <button className="save-link" onClick={clearCache} disabled={downloading}>
+              キャッシュを削除
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="attribution">地図・航空写真・標高: 国土地理院（GSI）タイル</div>
     </div>
