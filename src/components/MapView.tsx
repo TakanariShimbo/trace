@@ -70,9 +70,11 @@ export default function MapView() {
   const [searchMode, setSearchMode] = useState<SearchMode>("both");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  // サイドバー開閉と、右下リモコンの表示。
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showRemote, setShowRemote] = useState(true);
 
   // --- 事前ロード（オフライン保存）UI の状態 --- //
-  const [panelOpen, setPanelOpen] = useState(false);
   const [maxZ, setMaxZ] = useState(PREFETCH_Z_DEFAULT);
   const [radiusKm, setRadiusKm] = useState(RADIUS_DEFAULT);
   const [center, setCenter] = useState<LonLat | null>(null);
@@ -287,10 +289,15 @@ export default function MapView() {
     };
   }, []);
 
-  // 中心・半径・パネル開閉に応じてプレビュー円を更新する。
+  // 中心・半径・サイドバー開閉に応じてプレビュー円を更新する。
   useEffect(() => {
-    apiRef.current?.setPreview(panelOpen ? center : null, radiusKm);
-  }, [center, radiusKm, panelOpen]);
+    apiRef.current?.setPreview(sidebarOpen ? center : null, radiusKm);
+  }, [center, radiusKm, sidebarOpen]);
+
+  // サイドバーを開いたら保存済み容量を取得し直す。
+  useEffect(() => {
+    if (sidebarOpen) navigator.storage?.estimate?.().then((e) => setStorageUsage(e.usage ?? 0));
+  }, [sidebarOpen]);
 
   // ベースマップ切替を地形へ反映する。
   useEffect(() => {
@@ -315,10 +322,6 @@ export default function MapView() {
   // --- 事前ロード操作 --- //
   const refreshStorage = () => {
     navigator.storage?.estimate?.().then((e) => setStorageUsage(e.usage ?? 0));
-  };
-  const openPanel = () => {
-    setPanelOpen(true);
-    refreshStorage();
   };
   const captureCenter = () => {
     setCenter(apiRef.current?.getCenter() ?? null);
@@ -364,6 +367,7 @@ export default function MapView() {
     apiRef.current?.flyTo({ lat: r.lat, lon: r.lon });
     setResults([]);
     setQuery(r.title);
+    setSidebarOpen(false); // 飛んだ先の地図が見えるよう閉じる
   };
 
   const SEARCH_MODES: { id: SearchMode; label: string }[] = [
@@ -378,115 +382,108 @@ export default function MapView() {
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
 
-      {/* 山名・土地名検索 → フライト（上中央） */}
-      <div className="search">
-        <div className="search-modes">
-          {SEARCH_MODES.map((m) => (
-            <button
-              key={m.id}
-              className={m.id === searchMode ? "is-active" : ""}
-              onClick={() => changeMode(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-        <form className="search-bar" onSubmit={doSearch}>
-          <input
-            type="search"
-            value={query}
-            placeholder={
-              searchMode === "mountain"
-                ? "山名で検索（例: 槍ヶ岳）"
-                : searchMode === "place"
-                  ? "地名で検索（例: 上高地）"
-                  : "山名・地名で検索（例: 富士山）"
-            }
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="submit" title="検索" disabled={searching}>
-            {searching ? "…" : "🔍"}
-          </button>
-        </form>
-        {results.length > 0 && (
-          <ul className="search-results">
-            {results.map((r, i) => (
-              <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
-                <button onClick={() => goToResult(r)}>
-                  <span className="res-ico">{r.kind === "mountain" ? "⛰" : "📍"}</span>
-                  <span className="res-title">{r.title}</span>
-                  {r.kind === "mountain" && (
-                    <span className="res-sub">
-                      {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <button className="save-open" title="事前ダウンロード（オフライン保存）" onClick={openPanel}>
-        ⤓ 事前保存
+      {/* メニュー開閉（左上） */}
+      <button
+        className="menu-toggle"
+        title="メニュー"
+        aria-label="メニュー"
+        onClick={() => setSidebarOpen((o) => !o)}
+      >
+        ☰
       </button>
 
-      {/* ベースマップ切替（左下） */}
-      <div className="basemap-switch">
-        {BASEMAPS.map((b) => (
-          <button
-            key={b.id}
-            className={b.id === basemapId ? "is-active" : ""}
-            onClick={() => setBasemapId(b.id)}
-          >
-            {b.label}
-          </button>
-        ))}
-      </div>
+      {/* サイドバー背景（タップで閉じる） */}
+      {sidebarOpen && <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
 
-      {/* カメラ操作ボタン（右下） */}
-      <div className="nav-controls">
-        <div className="nav-row">
-          <button className="nav-btn" title="水平に近づける" {...hold({ tilt: 1 }, "tilt")}>
-            <span className="nav-ico nav-ico--tilt-up" />
-          </button>
-          <button className="nav-btn" title="見下ろす" {...hold({ tilt: -1 }, "tilt")}>
-            <span className="nav-ico nav-ico--tilt-down" />
-          </button>
+      {/* サイドバー：検索・地図・表示・事前保存 */}
+      <aside className={`sidebar${sidebarOpen ? " is-open" : ""}`}>
+        <div className="sidebar-head">
+          <span>GSI 3D Map</span>
+          <button className="sidebar-close" title="閉じる" onClick={() => setSidebarOpen(false)}>×</button>
         </div>
-        <div className="nav-row">
-          <button className="nav-btn" title="左に回す" {...hold({ orbit: 1 }, "orbit")}>↺</button>
-          <button className="nav-btn" title="右に回す" {...hold({ orbit: -1 }, "orbit")}>↻</button>
-        </div>
-        <div className="nav-pad">
-          <button className="nav-btn nav-up" title="前へ" {...hold({ panZ: 1 }, "panZ")}>▲</button>
-          <button className="nav-btn nav-left" title="左へ" {...hold({ panX: -1 }, "panX")}>◀</button>
-          <button
-            className="nav-btn nav-home"
-            title="日本全体に戻す"
-            onClick={() => {
-              navRef.current.home = true;
-            }}
-          >
-            ⌂
-          </button>
-          <button className="nav-btn nav-right" title="右へ" {...hold({ panX: 1 }, "panX")}>▶</button>
-          <button className="nav-btn nav-down" title="後ろへ" {...hold({ panZ: -1 }, "panZ")}>▼</button>
-        </div>
-        <div className="nav-zoom">
-          <button className="nav-btn" title="ズームイン" {...hold({ dolly: 1 }, "dolly")}>＋</button>
-          <button className="nav-btn" title="ズームアウト" {...hold({ dolly: -1 }, "dolly")}>−</button>
-        </div>
-      </div>
 
-      {/* オフライン保存パネル（中心＋半径） */}
-      {panelOpen && (
-        <div className="save-panel">
-          <div className="save-head">
-            <span>オフライン保存</span>
-            <button className="save-close" title="閉じる" onClick={() => setPanelOpen(false)}>×</button>
+        {/* 検索 */}
+        <section className="side-sec">
+          <h3>検索</h3>
+          <div className="search-modes">
+            {SEARCH_MODES.map((m) => (
+              <button
+                key={m.id}
+                className={m.id === searchMode ? "is-active" : ""}
+                onClick={() => changeMode(m.id)}
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
+          <form className="search-bar" onSubmit={doSearch}>
+            <input
+              type="search"
+              value={query}
+              placeholder={
+                searchMode === "mountain"
+                  ? "山名で検索（例: 槍ヶ岳）"
+                  : searchMode === "place"
+                    ? "地名で検索（例: 上高地）"
+                    : "山名・地名で検索（例: 富士山）"
+              }
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <button type="submit" title="検索" disabled={searching}>
+              {searching ? "…" : "🔍"}
+            </button>
+          </form>
+          {results.length > 0 && (
+            <ul className="search-results">
+              {results.map((r, i) => (
+                <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
+                  <button onClick={() => goToResult(r)}>
+                    <span className="res-ico">{r.kind === "mountain" ? "⛰" : "📍"}</span>
+                    <span className="res-title">{r.title}</span>
+                    {r.kind === "mountain" && (
+                      <span className="res-sub">
+                        {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
+        {/* 地図（ベースマップ） */}
+        <section className="side-sec">
+          <h3>地図</h3>
+          <div className="basemap-switch">
+            {BASEMAPS.map((b) => (
+              <button
+                key={b.id}
+                className={b.id === basemapId ? "is-active" : ""}
+                onClick={() => setBasemapId(b.id)}
+              >
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* 表示 */}
+        <section className="side-sec">
+          <h3>表示</h3>
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={showRemote}
+              onChange={(e) => setShowRemote(e.target.checked)}
+            />
+            <span>操作リモコンを表示（右下）</span>
+          </label>
+        </section>
+
+        {/* 事前保存（オフライン） */}
+        <section className="side-sec">
+          <h3>事前保存（オフライン）</h3>
           <p className="save-note">
             画面中央（見ている地点）を中心に、指定した半径・詳細度ぶんを保存します。
             保存後は通信なしでもその範囲を3D表示できます。
@@ -575,6 +572,43 @@ export default function MapView() {
             <button className="save-link" onClick={clearCache} disabled={downloading}>
               キャッシュを削除
             </button>
+          </div>
+        </section>
+      </aside>
+
+      {/* カメラ操作リモコン（右下、表示切替可） */}
+      {showRemote && (
+        <div className="nav-controls">
+          <div className="nav-row">
+            <button className="nav-btn" title="水平に近づける" {...hold({ tilt: 1 }, "tilt")}>
+              <span className="nav-ico nav-ico--tilt-up" />
+            </button>
+            <button className="nav-btn" title="見下ろす" {...hold({ tilt: -1 }, "tilt")}>
+              <span className="nav-ico nav-ico--tilt-down" />
+            </button>
+          </div>
+          <div className="nav-row">
+            <button className="nav-btn" title="左に回す" {...hold({ orbit: 1 }, "orbit")}>↺</button>
+            <button className="nav-btn" title="右に回す" {...hold({ orbit: -1 }, "orbit")}>↻</button>
+          </div>
+          <div className="nav-pad">
+            <button className="nav-btn nav-up" title="前へ" {...hold({ panZ: 1 }, "panZ")}>▲</button>
+            <button className="nav-btn nav-left" title="左へ" {...hold({ panX: -1 }, "panX")}>◀</button>
+            <button
+              className="nav-btn nav-home"
+              title="日本全体に戻す"
+              onClick={() => {
+                navRef.current.home = true;
+              }}
+            >
+              ⌂
+            </button>
+            <button className="nav-btn nav-right" title="右へ" {...hold({ panX: 1 }, "panX")}>▶</button>
+            <button className="nav-btn nav-down" title="後ろへ" {...hold({ panZ: -1 }, "panZ")}>▼</button>
+          </div>
+          <div className="nav-zoom">
+            <button className="nav-btn" title="ズームイン" {...hold({ dolly: 1 }, "dolly")}>＋</button>
+            <button className="nav-btn" title="ズームアウト" {...hold({ dolly: -1 }, "dolly")}>−</button>
           </div>
         </div>
       )}

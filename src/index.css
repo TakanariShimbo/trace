@@ -47,13 +47,106 @@ body,
 }
 
 /* --- 地名検索（上中央） --- */
-.search {
+/* --- メニュー開閉ボタン（左上） --- */
+.menu-toggle {
   position: absolute;
   top: max(8px, env(safe-area-inset-top, 8px));
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(420px, calc(100vw - 120px));
+  left: max(8px, env(safe-area-inset-left, 8px));
+  width: 42px;
+  height: 42px;
+  font-size: 20px;
+  color: #e6edf5;
+  background: rgba(18, 24, 33, 0.78);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 20;
 }
+.menu-toggle:hover {
+  background: rgba(34, 46, 62, 0.85);
+}
+
+/* --- サイドバー --- */
+.sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 25;
+}
+.sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(340px, 86vw);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-top: max(10px, env(safe-area-inset-top, 10px));
+  overflow-y: auto;
+  color: #e6edf5;
+  background: rgba(12, 16, 23, 0.97);
+  border-right: 1px solid rgba(130, 150, 175, 0.22);
+  box-shadow: 6px 0 30px rgba(0, 0, 0, 0.5);
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  z-index: 30;
+}
+.sidebar.is-open {
+  transform: translateX(0);
+}
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 15px;
+  padding-bottom: 6px;
+}
+.sidebar-close {
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  color: #aeb8c6;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sidebar-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.side-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(130, 150, 175, 0.16);
+}
+.side-sec h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #8fa2bb;
+}
+.side-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #dbe3ee;
+  cursor: pointer;
+}
+.side-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4f86c6;
+}
+
 .search-modes {
   display: flex;
   gap: 4px;
@@ -166,23 +259,15 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
-/* --- ベースマップ切替（左下、出典の上に重ねる） --- */
+/* --- ベースマップ切替（サイドバー内・折返しグリッド） --- */
 .basemap-switch {
-  position: absolute;
-  left: 8px;
-  bottom: calc(max(8px, env(safe-area-inset-bottom, 8px)) + 30px);
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: rgba(14, 19, 27, 0.85);
-  border: 1px solid rgba(130, 150, 175, 0.25);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
 }
 .basemap-switch button {
-  padding: 6px 9px;
-  font-size: 12px;
+  padding: 8px 9px;
+  font-size: 13px;
   color: #cdd6e2;
   background: transparent;
   border: 1px solid transparent;
@@ -279,63 +364,7 @@ body,
   color: #aeb8c6;
 }
 
-/* --- オフライン保存（事前ロード） --- */
-.save-open {
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 8px));
-  right: max(10px, env(safe-area-inset-right, 10px));
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #e6edf5;
-  background: rgba(18, 24, 33, 0.72);
-  border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 10px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.save-open:hover {
-  background: rgba(34, 46, 62, 0.85);
-}
-
-.save-panel {
-  position: absolute;
-  top: max(52px, calc(env(safe-area-inset-top, 8px) + 44px));
-  right: max(10px, env(safe-area-inset-right, 10px));
-  width: min(340px, calc(100vw - 20px));
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  color: #e6edf5;
-  background: rgba(14, 19, 27, 0.94);
-  border: 1px solid rgba(130, 150, 175, 0.25);
-  border-radius: 12px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-
-.save-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-}
-.save-close {
-  width: 28px;
-  height: 28px;
-  font-size: 18px;
-  color: #aeb8c6;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.save-close:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
+/* --- オフライン保存（事前ロード、サイドバー内） --- */
 .save-note {
   margin: 0;
   font-size: 12px;
