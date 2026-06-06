@@ -1483,11 +1483,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       ctx.moveTo(cx, cy);
       ctx.lineTo(dotX, dotY);
       ctx.stroke();
-      // 点
-      ctx.fillStyle = "#ff8a3c";
+      // 点（白丸・小さめ。視認用に細い暗縁）
       ctx.beginPath();
-      ctx.arc(dotX, dotY, Math.max(3, fs * 0.16), 0, Math.PI * 2);
+      ctx.arc(dotX, dotY, Math.max(2.5, H * 0.009), 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
       ctx.fill();
+      ctx.lineWidth = Math.max(1, H * 0.0016);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.stroke();
       // チップ（名札。中心 = cx,cy）
       ctx.fillStyle = "rgba(40, 92, 152, 0.92)";
       ctx.beginPath();

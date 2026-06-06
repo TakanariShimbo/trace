@@ -1136,7 +1136,7 @@ body,
   border-radius: 10px;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 21;
+  z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)より前面に出す */
 }
 .ar-step {
   display: inline-flex;
@@ -1352,15 +1352,21 @@ body,
 }
 .ar-edit-dot {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 20px; /* つかみやすいよう当たり判定は広め（見た目は中の白丸のみ） */
+  height: 20px;
   transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: #ff8a3c;
-  border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  background: transparent;
   cursor: grab;
   touch-action: none;
+}
+.ar-edit-dot::before {
+  content: "";
+  position: absolute;
+  inset: 6px; /* 見た目は約8pxの白丸（従来22pxの約1/3） */
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .ar-edit-dot:active {
   cursor: grabbing;
