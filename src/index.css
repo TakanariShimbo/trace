@@ -282,6 +282,178 @@ body,
   accent-color: #4f86c6;
 }
 
+/* --- トグルスイッチ行（表示・太陽月） --- */
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #dbe3ee;
+  cursor: pointer;
+}
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 11px;
+  background: #36425a;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e8eef6;
+  transition: left 0.15s;
+}
+.switch:checked {
+  background: #4f86c6;
+}
+.switch:checked::after {
+  left: 18px;
+}
+
+/* --- スライダー行（標高の誇張など） --- */
+.slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+.slider-label {
+  font-size: 12.5px;
+  color: #cdd6e2;
+}
+.slider-label b {
+  color: #fff;
+  margin: 0 2px;
+  font-variant-numeric: tabular-nums;
+}
+.slider-row input[type="range"] {
+  width: 100%;
+  accent-color: #4f86c6;
+}
+
+/* --- 日時行（太陽・月） --- */
+.datetime-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dt-date {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 8px;
+  color-scheme: dark;
+}
+.dt-time {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: #e6edf5;
+  min-width: 44px;
+  text-align: center;
+}
+.dt-now {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #cfe0f5;
+  background: rgba(48, 100, 160, 0.35);
+  border: 1px solid rgba(120, 180, 240, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dt-now:hover {
+  background: rgba(48, 100, 160, 0.55);
+}
+.dt-slider {
+  width: 100%;
+  accent-color: #4f86c6;
+}
+
+/* --- 太陽・月の情報カード --- */
+.sky-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(130, 150, 175, 0.16);
+  border-radius: 10px;
+}
+.sky-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sky-ico {
+  flex: none;
+}
+.sky-ico--sun {
+  color: #ffce6a;
+}
+.sky-info {
+  min-width: 0;
+}
+.sky-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #eef3f9;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sky-pct {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #9fb4cf;
+}
+.sky-sub {
+  font-size: 11.5px;
+  color: #9aabc2;
+  font-variant-numeric: tabular-nums;
+}
+/* 月相サイクル帯（新月→満月→新月で今どこかを示す） */
+.moon-cycle {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+.moon-cyc {
+  display: flex;
+  padding: 3px;
+  border-radius: 7px;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+.moon-cyc.is-now {
+  opacity: 1;
+  background: rgba(79, 134, 198, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(130, 185, 240, 0.6);
+}
+
+.sky-times {
+  font-size: 12px;
+  color: #aeb8c6;
+  border-top: 1px solid rgba(130, 150, 175, 0.14);
+  padding-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 .search-modes {
   display: flex;
   gap: 4px;

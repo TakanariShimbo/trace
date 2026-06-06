@@ -17,6 +17,8 @@ import {
   IconLocate,
   IconCamera,
   IconMap,
+  IconSun,
+  IconMoonPhase,
 } from "./icons";
 import {
   worldToLonLat,
@@ -825,6 +827,29 @@ export default function MapView() {
     const dirs = ["北", "北東", "東", "南東", "南", "南西", "西", "北西"];
     return dirs[Math.round(((deg % 360) / 45)) % 8];
   };
+  // 月相名（phase: 0=新月, 0.25=上弦, 0.5=満月, 0.75=下弦, 1=新月）。
+  const moonPhaseName = (phase: number) => {
+    if (phase < 0.03 || phase >= 0.97) return "新月";
+    if (phase < 0.22) return "三日月";
+    if (phase < 0.28) return "上弦の月";
+    if (phase < 0.47) return "満ちる月（凸）";
+    if (phase < 0.53) return "満月";
+    if (phase < 0.72) return "欠ける月（凸）";
+    if (phase < 0.78) return "下弦の月";
+    return "有明月";
+  };
+  // スイッチ行（表示セクション用）。
+  const switchRow = (label: string, checked: boolean, onChange: (b: boolean) => void) => (
+    <label className="switch-row">
+      <span>{label}</span>
+      <input
+        type="checkbox"
+        className="switch"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    </label>
+  );
 
   // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
   const goHome = () => {
@@ -1022,34 +1047,14 @@ export default function MapView() {
         {/* 表示 */}
         <section className={secClass("view")}>
           {secHead("view", "表示")}
-          <label className="side-toggle">
-            <input
-              type="checkbox"
-              checked={showRemote}
-              onChange={(e) => setShowRemote(e.target.checked)}
-            />
-            <span>操作リモコンを表示（右下）</span>
-          </label>
-          <label className="side-toggle">
-            <input
-              type="checkbox"
-              checked={showCenter}
-              onChange={(e) => setShowCenter(e.target.checked)}
-            />
-            <span>中心マーカーを表示</span>
-          </label>
-          <label className="side-toggle">
-            <input
-              type="checkbox"
-              checked={showSky}
-              onChange={(e) => setShowSky(e.target.checked)}
-            />
-            <span>空のグラデーションを表示</span>
-          </label>
-          <label className="save-field">
-            <span>
-              標高の誇張（{mode === "camera" ? "カメラ" : "地図"}）: ×{activeVex.toFixed(1)}
-              {activeVex === 1 ? "（実寸 1:1:1）" : ""}
+          {switchRow("操作リモコン（右下）", showRemote, setShowRemote)}
+          {switchRow("中心マーカー", showCenter, setShowCenter)}
+          {switchRow("空のグラデーション", showSky, setShowSky)}
+          <label className="slider-row">
+            <span className="slider-label">
+              標高の誇張（{mode === "camera" ? "カメラ" : "地図"}）
+              <b>×{activeVex.toFixed(1)}</b>
+              {activeVex === 1 ? " 実寸" : ""}
             </span>
             <input
               type="range"
@@ -1065,65 +1070,80 @@ export default function MapView() {
         {/* 太陽・月 */}
         <section className={secClass("sun")}>
           {secHead("sun", "太陽・月")}
-          <label className="side-toggle">
+          <label className="switch-row">
+            <span>太陽・月を表示</span>
             <input
               type="checkbox"
+              className="switch"
               checked={celestialOn}
               onChange={(e) => toggleCelestial(e.target.checked)}
             />
-            <span>太陽・月を表示</span>
           </label>
 
           {celestialOn && (
             <>
-              {sunObserver && (
-                <div className="save-center">
-                  中心: {sunObserver.lat.toFixed(4)}°, {sunObserver.lon.toFixed(4)}°
-                </div>
-              )}
-
-              <label className="save-field">
-                <span>日付</span>
+              <div className="datetime-row">
                 <input
                   type="date"
+                  className="dt-date"
                   value={dateStr}
                   onChange={(e) => setDateStr(e.target.value)}
                 />
-              </label>
-
-              <label className="save-field">
-                <span>時刻: {hhmm}</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={1439}
-                  value={minutes}
-                  onChange={(e) => setMinutes(Number(e.target.value))}
-                />
-              </label>
-
-              <button className="save-link" onClick={setSunNow}>
-                現在日時にリセット
-              </button>
+                <span className="dt-time">{hhmm}</span>
+                <button className="dt-now" onClick={setSunNow}>
+                  現在
+                </button>
+              </div>
+              <input
+                type="range"
+                className="dt-slider"
+                min={0}
+                max={1439}
+                value={minutes}
+                onChange={(e) => setMinutes(Number(e.target.value))}
+              />
 
               {skyInfo && (
-                <div className="save-plan">
-                  <div>
-                    ☀ 太陽: 方位 {skyInfo.sun.azimuthDeg.toFixed(0)}° / 高度{" "}
-                    {skyInfo.sun.altitudeDeg.toFixed(0)}°
-                    {!skyInfo.sun.visible && "（地平線下）"}
+                <div className="sky-card">
+                  <div className="sky-row">
+                    <IconSun size={22} className="sky-ico sky-ico--sun" />
+                    <div className="sky-info">
+                      <div className="sky-name">太陽</div>
+                      <div className="sky-sub">
+                        方位 {compass(skyInfo.sun.azimuthDeg)} {skyInfo.sun.azimuthDeg.toFixed(0)}° ・ 高度{" "}
+                        {skyInfo.sun.altitudeDeg.toFixed(0)}°
+                        {!skyInfo.sun.visible && " ・ 地平線下"}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    ☾ 月: 方位 {skyInfo.moon.azimuthDeg.toFixed(0)}° / 高度{" "}
-                    {skyInfo.moon.altitudeDeg.toFixed(0)}°
-                    {!skyInfo.moon.visible && "（地平線下）"}
+                  <div className="sky-row">
+                    <IconMoonPhase fraction={skyInfo.moonFraction} waxing={skyInfo.moonWaxing} size={24} />
+                    <div className="sky-info">
+                      <div className="sky-name">
+                        {moonPhaseName(skyInfo.moonPhase)}
+                        <span className="sky-pct">照度 {(skyInfo.moonFraction * 100).toFixed(0)}%</span>
+                      </div>
+                      <div className="sky-sub">
+                        方位 {compass(skyInfo.moon.azimuthDeg)} {skyInfo.moon.azimuthDeg.toFixed(0)}° ・ 高度{" "}
+                        {skyInfo.moon.altitudeDeg.toFixed(0)}°
+                        {!skyInfo.moon.visible && " ・ 地平線下"}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    月齢: 照度 {(skyInfo.moonFraction * 100).toFixed(0)}%（
-                    {skyInfo.moonWaxing ? "満ちる" : "欠ける"}）
+                  <div className="moon-cycle">
+                    {Array.from({ length: 8 }, (_, i) => {
+                      const p = i / 8;
+                      const now = Math.round(skyInfo.moonPhase * 8) % 8 === i;
+                      return (
+                        <div key={i} className={`moon-cyc${now ? " is-now" : ""}`} title={moonPhaseName(p)}>
+                          <IconMoonPhase fraction={(1 - Math.cos(2 * Math.PI * p)) / 2} waxing={p < 0.5} size={20} />
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div>
-                    日の出 {fmtTime(skyInfo.sunrise)} / 日の入 {fmtTime(skyInfo.sunset)}
+
+                  <div className="sky-times">
+                    日の出 {fmtTime(skyInfo.sunrise)} ・ 日の入 {fmtTime(skyInfo.sunset)}
                   </div>
                 </div>
               )}

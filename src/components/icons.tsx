@@ -113,6 +113,50 @@ export function IconMinus({ size = 18, className }: Props) {
   );
 }
 
+/** 太陽（円＋光条）。 */
+export function IconSun({ size = 18, className }: Props) {
+  const rays = Array.from({ length: 8 }, (_, i) => {
+    const a = (i / 8) * Math.PI * 2;
+    return (
+      <line
+        key={i}
+        x1={(12 + Math.cos(a) * 8).toFixed(2)}
+        y1={(12 + Math.sin(a) * 8).toFixed(2)}
+        x2={(12 + Math.cos(a) * 10.5).toFixed(2)}
+        y2={(12 + Math.sin(a) * 10.5).toFixed(2)}
+      />
+    );
+  });
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="12" cy="12" r="5" />
+      {rays}
+    </svg>
+  );
+}
+
+/** 月相ビジュアル。illuminated 割合(0-1)と waxing(右が光る) で満ち欠けを描く。 */
+export function IconMoonPhase({
+  fraction,
+  waxing,
+  size = 26,
+  className,
+}: Props & { fraction: number; waxing: boolean }) {
+  const R = size / 2 - 1.2;
+  const c = size / 2;
+  const k = Math.min(Math.max(fraction, 0), 1);
+  const a = R * Math.abs(2 * k - 1); // ターミネータ楕円の横半径
+  const limbSweep = waxing ? 1 : 0;
+  const termSweep = waxing ? (k > 0.5 ? 1 : 0) : k > 0.5 ? 0 : 1;
+  const lit = `M ${c} ${c - R} A ${R} ${R} 0 0 ${limbSweep} ${c} ${c + R} A ${a.toFixed(2)} ${R} 0 0 ${termSweep} ${c} ${c - R} Z`;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className={className} aria-hidden="true">
+      <circle cx={c} cy={c} r={R} fill="#10151c" stroke="#39465c" strokeWidth="0.8" />
+      {k > 0.004 && <path d={lit} fill="#dfe6f0" />}
+    </svg>
+  );
+}
+
 /** カメラ。 */
 export function IconCamera({ size = 16, className }: Props) {
   return (

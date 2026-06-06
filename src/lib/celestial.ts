@@ -17,6 +17,7 @@ export type SkyState = {
   moon: SkyBody;
   moonFraction: number; // 月の照らされている割合 0..1
   moonWaxing: boolean; // 満ちていく途中（true=右側が光る／false=欠けていく＝左側）
+  moonPhase: number; // 月相 0=新月 0.25=上弦 0.5=満月 0.75=下弦 1=新月
   sunrise: Date | null;
   sunset: Date | null;
 };
@@ -77,6 +78,7 @@ export function computeSky(date: Date, lat: number, lon: number): SkyState {
     },
     moonFraction: ill.fraction,
     moonWaxing: ill.phase < 0.5,
+    moonPhase: ill.phase,
     sunrise: valid(times.sunrise),
     sunset: valid(times.sunset),
   };
