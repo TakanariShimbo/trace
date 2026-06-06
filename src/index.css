@@ -1356,3 +1356,31 @@ body,
   gap: 10px;
   justify-content: space-between;
 }
+
+/* 山選択フェーズ: 参照用の撮影写真サムネ（右上） */
+.ar-select-thumb {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top, 8px)) + 42px);
+  right: max(8px, env(safe-area-inset-right, 8px));
+  width: min(180px, 32vw);
+  max-height: 30vh;
+  object-fit: contain;
+  border: 1px solid rgba(130, 150, 175, 0.4);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+}
+/* 山選択フェーズ: 決定バー内の選択数 */
+.ar-select-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #cdd6e2;
+  white-space: nowrap;
+}
+.ar-bottom-bar {
+  align-items: center;
+}

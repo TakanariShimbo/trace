@@ -129,7 +129,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setFreeLook: (on: boolean) => void;
     enterCamera: (
       eyeHeightM: number,
-      override?: { lon: number; lat: number; headingDeg?: number; fovDeg?: number },
+      override?: { lon: number; lat: number; headingDeg?: number; pitchDeg?: number; fovDeg?: number },
     ) => { heading: number; pitch: number; fov: number };
     exitCamera: () => void;
     setCamLook: (heading: number, pitch: number) => void;
@@ -140,8 +140,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setPeaksVisible: (on: boolean) => void;
     setPeaksData: (data: Awaited<ReturnType<typeof loadAllMountains>>) => void;
     clearPeakSelection: () => void;
-    revealAllPeaks: (on: boolean) => void; // AR山選択フェーズ: 未選択の点も出して選べるように
     getPeakSelection: () => { name: string; elevM: number; sx: number; sy: number }[]; // 書き出し用: 選択山の画面座標
+    frameSelectView: (lon: number, lat: number, headingDeg: number) => void; // AR山選択: 撮影地点後方上空の俯瞰へ
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -478,7 +478,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           camera.getWorldDirection(dirTmp); // 初期方位＝今の水平向き
           cam.heading = ((Math.atan2(dirTmp.x, -dirTmp.z) * 180) / Math.PI + 360) % 360;
         }
-        cam.pitch = 0;
+        cam.pitch =
+          override?.pitchDeg != null
+            ? THREE.MathUtils.clamp(override.pitchDeg, -CAM_PITCH_LIMIT, CAM_PITCH_LIMIT) // 復帰時の仰角
+            : 0;
         cam.fov =
           override?.fovDeg != null
             ? THREE.MathUtils.clamp(override.fovDeg, CAM_FOV_MIN, CAM_FOV_MAX) // EXIF焦点距離由来
@@ -530,8 +533,24 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       clearPeakSelection: () => {
         peaks.clearSelection(); // ラベルの選択強調は次フレームの updatePeakLabels で反映
       },
-      // AR山選択フェーズ: on で未選択(橙)の点も表示してタップで選べるように。off で選択のみ。
-      revealAllPeaks: (on) => peaks.setCameraMode(!on),
+      // AR山選択: 撮影地点の少し後ろ上空から heading 方向を見下ろす局所俯瞰へ即セット。
+      // 写真に写る前後の山が奥行きつきで見え、タップで選びやすい。
+      frameSelectView: (lon, lat, headingDeg) => {
+        const ex = mercXToWorld(lonToMercX(lon));
+        const ez = mercYToWorld(latToMercY(lat));
+        const h = sampleSurfaceY(ex, ez);
+        const hr = (headingDeg * Math.PI) / 180;
+        const fx = Math.sin(hr); // 前方(heading)の水平成分（X=東, Z=南, 北=-Z）
+        const fz = -Math.cos(hr);
+        const BACK = 120; // 撮影地点の後ろへ引く距離(world)
+        const UP = 95; // 上空へ上げる高さ(world)
+        const AHEAD = 80; // 注視点を前方へ置く距離(world)
+        controls.target.set(ex + fx * AHEAD, h, ez + fz * AHEAD);
+        camera.position.set(ex - fx * BACK, h + UP, ez - fz * BACK);
+        camera.up.set(0, 1, 0);
+        flyGoal = null; // 進行中の fly を止める
+        controls.update();
+      },
       // 書き出し用: 選択中の山頂を画面座標つきで返す（カメラ後方は除外）。
       getPeakSelection: () => {
         const w = mount.clientWidth;
@@ -1059,7 +1078,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
   // カメラ視点モードへ（太陽月は維持。自由視点はマップ専用なのでオフにしてから入る）。
   const enterCameraMode = (
-    override?: { lon: number; lat: number; headingDeg?: number; fovDeg?: number },
+    override?: { lon: number; lat: number; headingDeg?: number; pitchDeg?: number; fovDeg?: number },
   ) => {
     if (freeLook) {
       setFreeLook(false);
@@ -1138,21 +1157,36 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArCompositeUrl(null);
     setArStep("upload");
   };
-  // 合わせる→山選択へ（未選択の点も出してタップで選べるように）。
+  // 合わせる(一人称)→山選択(3D俯瞰地図)。奥行きが見えてどの山が手前/奥か分かりやすい。
+  // 地図モード中は camHeading/Pitch/Fov が変わらないので、合わせたポーズは状態に保たれる。
   const goSelect = () => {
-    apiRef.current?.revealAllPeaks(true);
+    exitCameraMode(); // 一人称→地図モードへ
+    if (arLoc) apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading); // 撮影地点後方の俯瞰へ
     setArStep("select");
   };
-  // 山選択→合わせるへ戻る（選択中の点だけに戻す）。
+  // 合わせたポーズ(状態に保持)で一人称へ復帰。
+  const restoreAlignedCamera = () => {
+    if (!arLoc) return;
+    enterCameraMode({
+      lon: arLoc.lon,
+      lat: arLoc.lat,
+      headingDeg: camHeading,
+      pitchDeg: camPitch,
+      fovDeg: camFov,
+    });
+  };
+  // 山選択→合わせるへ戻る（一人称ポーズに復帰）。
   const backToAlign = () => {
-    apiRef.current?.revealAllPeaks(false);
+    restoreAlignedCamera();
     setArStep("align");
   };
   // 選択した山頂を写真の上に「山名＋標高」で焼き込み、合成画像(JPEG)を作る。
   const generateComposite = async () => {
     const mount = mountRef.current;
     if (!photoUrl || !mount) return;
-    const sel = apiRef.current?.getPeakSelection() ?? []; // 画面座標は今の投影で確定
+    // 一人称へ復帰した直後はカメラ行列が次フレームで反映されるため、2フレーム待ってから投影。
+    await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+    const sel = apiRef.current?.getPeakSelection() ?? []; // 合わせたポーズでの投影座標
     const img = new Image();
     img.src = photoUrl;
     await img.decode();
@@ -1207,15 +1241,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     }
     setArCompositeUrl(canvas.toDataURL("image/jpeg", 0.92));
   };
-  // 山選択→書き出しへ。合成して結果フェーズを表示。
+  // 山選択→書き出しへ。一人称(合わせたポーズ)へ復帰してから写真へ投影・合成。
   const goExport = () => {
+    restoreAlignedCamera(); // 俯瞰地図→写真に合わせた一人称へ戻す
     setArStep("export");
     void generateComposite();
   };
-  // 書き出し→山選択へ戻る（合成をやり直せるように）。
+  // 書き出し→山選択(俯瞰地図)へ戻る（合成をやり直せるように）。
   const backToSelectFromExport = () => {
     setArCompositeUrl(null);
-    apiRef.current?.revealAllPeaks(true);
+    exitCameraMode();
+    if (arLoc) apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
     setArStep("select");
   };
   // 書き出した合成画像をダウンロード。
@@ -1386,6 +1422,28 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </>
       )}
 
+      {/* ⑤ 山選択フェーズ: 3D俯瞰地図で山頂をタップ選択（奥行きが分かる） */}
+      {appMode === "ar" && arStep === "select" && (
+        <>
+          <div className="ar-locate-hint">
+            <IconMountain size={15} />
+            <span>写真に写る山を3Dマップ上でタップして選びます（手前/奥が分かりやすい）</span>
+          </div>
+          {photoUrl && (
+            <img className="ar-select-thumb" src={photoUrl} alt="撮影写真" title="撮影した写真" />
+          )}
+          <div className="ar-bottom-bar">
+            <button className="ar-btn-sub" onClick={backToAlign}>
+              ← 向き調整
+            </button>
+            <span className="ar-select-count">選択 {peakSelCount} 山</span>
+            <button className="ar-btn-main" disabled={peakSelCount === 0} onClick={goExport}>
+              書き出し →
+            </button>
+          </div>
+        </>
+      )}
+
       {/* ③ 撮影情報フェーズ: 横画角の入力 */}
       {appMode === "ar" && arStep === "params" && (
         <div className="ar-params">
@@ -1546,22 +1604,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               <button className="ar-btn-main ar-btn-wide" onClick={goSelect}>
                 次へ：山を選ぶ
               </button>
-            </div>
-          )}
-          {/* AR ⑤山選択: 写真の山をタップ→書き出しへ */}
-          {appMode === "ar" && arStep === "select" && (
-            <div className="ar-phase-foot">
-              <span className="cam-hint">
-                写真に写っている山をタップして名前を出します（選択 {peakSelCount} 山）
-              </span>
-              <div className="ar-phase-foot-row">
-                <button className="ar-btn-sub" onClick={backToAlign}>
-                  ← 向き調整
-                </button>
-                <button className="ar-btn-main" disabled={peakSelCount === 0} onClick={goExport}>
-                  書き出し →
-                </button>
-              </div>
             </div>
           )}
         </div>
