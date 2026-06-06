@@ -251,42 +251,6 @@ body,
   background: rgba(60, 70, 86, 0.8);
 }
 
-/* GPSなし写真の手動位置指定ガイド（上中央） */
-.photo-locate-hint {
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 8px));
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(520px, calc(100vw - 24px));
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px 8px 12px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #f1e9d2;
-  background: rgba(70, 56, 20, 0.92);
-  border: 1px solid rgba(200, 170, 90, 0.5);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: 20;
-}
-.photo-locate-hint > svg {
-  flex: 0 0 auto;
-}
-.photo-locate-hint button {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  font-size: 15px;
-  color: #f1e9d2;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(200, 170, 90, 0.4);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
 /* ホームへ戻る（左上・メニューの右） */
 .home-btn {
   position: absolute;
@@ -1156,4 +1120,176 @@ body,
 }
 .ar-intro-pick:hover {
   background: rgba(94, 150, 214, 0.95);
+}
+
+/* --- ARウィザード（地点 → 情報 → 合わせる） --- */
+/* 進行表示（上中央） */
+.ar-steps {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 8px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(14, 19, 27, 0.82);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 21;
+}
+.ar-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #8294aa;
+}
+.ar-step b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  border-radius: 50%;
+  background: rgba(130, 150, 175, 0.25);
+  color: #cdd6e2;
+}
+.ar-step.is-active {
+  color: #eaf2fb;
+}
+.ar-step.is-active b {
+  background: #4f86c6;
+  color: #fff;
+}
+.ar-step.is-done {
+  color: #9fb0c4;
+}
+.ar-step.is-done b {
+  background: rgba(79, 134, 198, 0.45);
+  color: #eaf2fb;
+}
+
+/* 撮影地点フェーズの案内（進行表示の下） */
+.ar-locate-hint {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top, 8px)) + 42px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(520px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #eaf2fb;
+  background: rgba(14, 19, 27, 0.82);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 20;
+}
+.ar-locate-hint > svg {
+  flex: 0 0 auto;
+  color: #6cb0ff;
+}
+
+/* 撮影地点ピン（地表に追従。下端が地点を指す） */
+.ar-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  color: #ff5a3c;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+  z-index: 6;
+}
+
+/* 下部の決定バー（地点/情報フェーズ共通） */
+.ar-bottom-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom, 16px));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 20;
+}
+.ar-bottom-bar--inline {
+  position: static;
+  transform: none;
+  margin-top: 4px;
+  justify-content: flex-end;
+}
+.ar-btn-main {
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(79, 134, 198, 0.95);
+  border: 1px solid rgba(120, 180, 240, 0.6);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ar-btn-main:hover {
+  background: rgba(94, 150, 214, 1);
+}
+.ar-btn-main:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ar-btn-sub {
+  padding: 11px 18px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(28, 36, 48, 0.85);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ar-btn-sub:hover {
+  background: rgba(40, 50, 66, 0.9);
+}
+
+/* 撮影情報フェーズ（中央パネル） */
+.ar-params {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 22px 18px;
+  color: #e6edf5;
+  background: rgba(14, 19, 27, 0.93);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 21;
+}
+.ar-params h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.ar-params p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #aebccf;
+}
+.ar-fov {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+.ar-fov input[type="range"] {
+  width: 100%;
+  accent-color: #4f86c6;
 }

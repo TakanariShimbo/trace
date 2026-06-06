@@ -179,9 +179,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 写真オーバーレイ（カメラ視点に撮影画像を重ね、手動で位置合わせ）。M1=重ね描画のみ。
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [photoOpacity, setPhotoOpacity] = useState(0.5);
-  // 取り込んだ写真にGPSが無く、地図で撮影地点を手動指定してほしい状態。
-  const [photoGpsMissing, setPhotoGpsMissing] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
+  // ARウィザードのフェーズ: 写真選択 → (位置がなければ)撮影地点選択 → (画角がなければ)情報入力 → 合わせる。
+  const [arStep, setArStep] = useState<"upload" | "locate" | "params" | "align">("upload");
+  const [arLoc, setArLoc] = useState<{ lat: number; lon: number } | null>(null); // 撮影地点
+  const [arHeadingDeg, setArHeadingDeg] = useState<number | null>(null); // EXIF撮影方位
+  const [arHasExifFov, setArHasExifFov] = useState(false); // EXIFに画角があったか
+  const [arFovDeg, setArFovDeg] = useState(CAM_FOV_DEFAULT); // 採用する横画角（EXIF or 手入力）
+  const arStepRef = useRef<"upload" | "locate" | "params" | "align">("upload"); // ループから参照
+  const arPinXZRef = useRef<{ x: number; z: number } | null>(null); // 撮影地点ピンのワールドXZ
+  const arPinElRef = useRef<HTMLDivElement | null>(null); // 撮影地点ピンのDOM
   // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
   const [openSec, setOpenSec] = useState<Record<string, boolean>>({
     search: true,
@@ -351,9 +358,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const cam = { heading: 0, pitch: 0, fov: CAM_FOV_DEFAULT, eyeX: 0, eyeZ: 0, groundElevM: 0, eyeHeightM: CAM_EYE_DEFAULT };
     const dirTmp = new THREE.Vector3();
     const camRay = new THREE.Raycaster();
+    const tapNDC = new THREE.Vector2(); // タップのNDC（AR撮影地点レイ用）
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // 地形に当たらない時の代用
+    const planeHit = new THREE.Vector3();
     const DOWN = new THREE.Vector3(0, -1, 0);
     const rayOrigin = new THREE.Vector3();
     const reticleWorld = new THREE.Vector3();
+    const arPinWorld = new THREE.Vector3(); // AR撮影地点ピンの投影用
     const sampleSurfaceY = (x: number, z: number): number => {
       // 観測点の上空から真下へレイし、表示中の地形メッシュ表面の高さを得る。
       rayOrigin.set(x, 9000, z);
@@ -593,8 +604,32 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const onTapUp = (e: PointerEvent) => {
       if (e.pointerId !== tapId) return;
       tapId = -1;
-      if (tapMoved || !peaks.points.visible) return;
+      if (tapMoved) return; // パン/回転とみなす
       const rect = renderer.domElement.getBoundingClientRect();
+      // AR撮影地点フェーズ: タップ地点を地形にレイキャストして撮影地点に置く。
+      if (arStepRef.current === "locate") {
+        tapNDC.set(
+          ((e.clientX - rect.left) / mount.clientWidth) * 2 - 1,
+          -((e.clientY - rect.top) / mount.clientHeight) * 2 + 1,
+        );
+        camRay.setFromCamera(tapNDC, camera);
+        const hits = camRay.intersectObjects(terrain.group.children, false);
+        let wx: number | null = null;
+        let wz: number | null = null;
+        if (hits.length) {
+          wx = hits[0].point.x;
+          wz = hits[0].point.z;
+        } else if (camRay.ray.intersectPlane(groundPlane, planeHit)) {
+          wx = planeHit.x; // 地形に当たらなければ海面で代用
+          wz = planeHit.z;
+        }
+        if (wx != null && wz != null) {
+          arPinXZRef.current = { x: wx, z: wz };
+          setArLoc(worldToLonLat(wx, wz));
+        }
+        return;
+      }
+      if (!peaks.points.visible) return;
       const i = peaks.pick(e.clientX - rect.left, e.clientY - rect.top, camera, mount.clientWidth, mount.clientHeight);
       if (i == null) return;
       peaks.toggle(i); // 色(橙↔青)が変わる。ラベルの選択強調は次フレームで反映
@@ -758,6 +793,25 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         }
       }
 
+      // AR撮影地点ピン（撮影地点フェーズのみ）。タップ/検索で置いた地点を地表に追従表示。
+      const arPinEl = arPinElRef.current;
+      if (arPinEl) {
+        const pxz = arPinXZRef.current;
+        if (arStepRef.current === "locate" && pxz) {
+          arPinWorld.set(pxz.x, sampleSurfaceY(pxz.x, pxz.z), pxz.z);
+          projTmp.copy(arPinWorld).project(camera);
+          if (projTmp.z <= 1) {
+            arPinEl.style.display = "block";
+            arPinEl.style.left = `${(projTmp.x * 0.5 + 0.5) * mount.clientWidth}px`;
+            arPinEl.style.top = `${(-projTmp.y * 0.5 + 0.5) * mount.clientHeight}px`;
+          } else {
+            arPinEl.style.display = "none";
+          }
+        } else {
+          arPinEl.style.display = "none";
+        }
+      }
+
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
@@ -828,6 +882,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       if (photoUrl) URL.revokeObjectURL(photoUrl);
     };
   }, [photoUrl]);
+
+  // ARフェーズをレンダリングループ用の ref に同期。
+  useEffect(() => {
+    arStepRef.current = arStep;
+  }, [arStep]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
   useEffect(() => {
@@ -930,6 +989,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   };
   const goToResult = (r: SearchResult) => {
     apiRef.current?.flyTo({ lat: r.lat, lon: r.lon });
+    if (arStep === "locate") placeArPoint(r.lat, r.lon); // AR地点選択中なら検索先を撮影地点に
     setResults([]);
     setQuery(r.title);
     setSidebarOpen(false); // 飛んだ先の地図が見えるよう閉じる
@@ -988,39 +1048,69 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     }
     apiRef.current?.setVerticalExaggeration(camVex); // カメラ用VEXへ（地形再生成）
     setMode("camera");
-    setPhotoGpsMissing(false); // 着地したら手動指定の案内は消す
   };
   const exitCameraMode = () => {
     apiRef.current?.exitCamera();
     apiRef.current?.setVerticalExaggeration(mapVex); // 地図用VEXへ戻す（地形再生成）
     setMode("map");
   };
-  // 写真起点フロー: 画像を取り込み→EXIF判定→GPSあれば自動着地／なければ地図で手動指定へ。
+
+  // === AR ウィザード（写真→撮影地点→撮影情報→合わせる） ===
+  // 撮影地点を置く（タップ/検索 共通）。ピンのワールドXZ(ref)と緯度経度(state)を同時更新。
+  const placeArPoint = (lat: number, lon: number) => {
+    setArLoc({ lat, lon });
+    arPinXZRef.current = { x: mercXToWorld(lonToMercX(lon)), z: mercYToWorld(latToMercY(lat)) };
+  };
+  // 「合わせる」フェーズへ: 撮影地点に着地し、向き・画角を初期化。
+  const goAlign = (loc: { lat: number; lon: number }, headingDeg: number | null, fovDeg: number) => {
+    setArStep("align");
+    enterCameraMode({ lon: loc.lon, lat: loc.lat, headingDeg: headingDeg ?? undefined, fovDeg });
+  };
+  // 写真を選んだら EXIF を読み、揃っていれば一気に、欠けていれば必要なフェーズへ進む。
   const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ""; // 同じファイルを連続で選べるようリセット
     if (!file) return;
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     setPhotoUrl(URL.createObjectURL(file));
-    setPhotoGpsMissing(false);
     const exif = await readPhotoExif(file);
+    setArHeadingDeg(exif.headingDeg);
+    const hasFov = exif.hFovDeg != null;
+    setArHasExifFov(hasFov);
+    const fov = hasFov
+      ? THREE.MathUtils.clamp(exif.hFovDeg as number, CAM_FOV_MIN, CAM_FOV_MAX)
+      : CAM_FOV_DEFAULT;
+    setArFovDeg(fov);
     if (exif.lat != null && exif.lon != null) {
-      // GPSあり → その地点へ立ち、方位・画角もEXIFがあれば初期化（無い項目は既定）。
-      enterCameraMode({
-        lon: exif.lon,
-        lat: exif.lat,
-        headingDeg: exif.headingDeg ?? undefined,
-        fovDeg: exif.hFovDeg ?? undefined,
-      });
+      const loc = { lat: exif.lat, lon: exif.lon };
+      placeArPoint(loc.lat, loc.lon);
+      if (hasFov) goAlign(loc, exif.headingDeg, fov); // 位置も画角も揃ってる → 一気に合わせる
+      else setArStep("params"); // 画角だけ聞く
     } else {
-      // GPSなし → 地図に留め、撮影地点へ移動して「カメラ視点」に入ってもらう。
-      setPhotoGpsMissing(true);
+      setArStep("locate"); // 位置から指定してもらう
     }
   };
-  const clearPhoto = () => {
+  // 撮影地点フェーズの「ここで決定」: 画角があれば合わせる、無ければ情報入力へ。
+  const confirmArLocate = () => {
+    if (!arLoc) return;
+    if (arHasExifFov) goAlign(arLoc, arHeadingDeg, arFovDeg);
+    else setArStep("params");
+  };
+  // 情報入力フェーズの「次へ」: 入力した画角で合わせる。
+  const confirmArParams = () => {
+    if (arLoc) goAlign(arLoc, arHeadingDeg, arFovDeg);
+  };
+  // 最初からやり直す（写真を外して写真選択フェーズへ）。
+  const restartAr = () => {
+    if (mode === "camera") exitCameraMode();
     if (photoUrl) URL.revokeObjectURL(photoUrl);
     setPhotoUrl(null);
-    setPhotoGpsMissing(false);
+    setArLoc(null);
+    arPinXZRef.current = null;
+    setArHeadingDeg(null);
+    setArHasExifFov(false);
+    setArFovDeg(CAM_FOV_DEFAULT);
+    setArStep("upload");
   };
   // 現在モードの標高誇張を変更（モードごとに記憶）。
   const activeVex = mode === "camera" ? camVex : mapVex;
@@ -1118,8 +1208,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {/* 写真取り込み input（モード非依存で1つだけ。地図/カメラ両方の入口から呼ぶ） */}
       <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={onPickPhoto} />
 
-      {/* ARの入口: まだ写真が無い間は写真選択を促す（ユーザー操作で input を開く） */}
-      {appMode === "ar" && !photoUrl && mode === "map" && (
+      {/* ① 写真選択フェーズ */}
+      {appMode === "ar" && arStep === "upload" && (
         <div className="ar-intro">
           <span className="ar-intro-icon">
             <IconImage size={34} />
@@ -1128,7 +1218,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <p>
             撮った写真を選ぶと、その撮影地点に立って3D地形と山名を重ねます。
             <br />
-            位置情報（GPS）があれば自動で、無ければ地図で撮影地点を指定します。
+            位置情報（GPS）があれば自動で、無ければ撮影地点を選んでもらいます。
           </p>
           <button className="ar-intro-pick" onClick={() => photoInputRef.current?.click()}>
             <IconImage size={16} />
@@ -1137,17 +1227,73 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
-      {/* GPSなし写真の手動位置指定ガイド（地図モード） */}
-      {mode === "map" && photoUrl && photoGpsMissing && (
-        <div className="photo-locate-hint">
-          <IconImage size={15} />
-          <span>この写真にGPSがありません。地図で撮影地点へ移動して「カメラ視点」に入ると重ねられます。</span>
-          <button onClick={clearPhoto} title="写真を外す">×</button>
+      {/* AR進行表示（地点 → 情報 → 合わせる） */}
+      {appMode === "ar" && arStep !== "upload" && (
+        <div className="ar-steps">
+          {(["locate", "params", "align"] as const).map((k, idx) => {
+            const order = { locate: 0, params: 1, align: 2 };
+            const cur = order[arStep as "locate" | "params" | "align"];
+            const cls = idx < cur ? "done" : idx === cur ? "active" : "todo";
+            const label = k === "locate" ? "撮影地点" : k === "params" ? "撮影情報" : "合わせる";
+            return (
+              <span key={k} className={`ar-step is-${cls}`}>
+                <b>{idx + 1}</b>
+                {label}
+              </span>
+            );
+          })}
         </div>
       )}
 
-      {/* 中心レティクル（注視点＝画面中央の目印） */}
-      {mode === "map" && showCenter && (
+      {/* ② 撮影地点フェーズ: 案内＋ピン＋決定バー */}
+      {appMode === "ar" && arStep === "locate" && (
+        <>
+          <div className="ar-locate-hint">
+            <IconPin size={15} />
+            <span>撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索</span>
+          </div>
+          <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
+            <IconPin size={30} />
+          </div>
+          <div className="ar-bottom-bar">
+            <button className="ar-btn-sub" onClick={restartAr}>
+              やり直す
+            </button>
+            <button className="ar-btn-main" disabled={!arLoc} onClick={confirmArLocate}>
+              ここで決定
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ③ 撮影情報フェーズ: 横画角の入力 */}
+      {appMode === "ar" && arStep === "params" && (
+        <div className="ar-params">
+          <h2>撮影情報</h2>
+          <p>写真に写っている範囲（横画角）を合わせます。だいたいでOK、あとで微調整できます。</p>
+          <label className="ar-fov">
+            <span>横画角 {Math.round(arFovDeg)}°（広い ←→ 望遠）</span>
+            <input
+              type="range"
+              min={CAM_FOV_MIN}
+              max={CAM_FOV_MAX}
+              value={Math.round(arFovDeg)}
+              onChange={(e) => setArFovDeg(Number(e.target.value))}
+            />
+          </label>
+          <div className="ar-bottom-bar ar-bottom-bar--inline">
+            <button className="ar-btn-sub" onClick={restartAr}>
+              やり直す
+            </button>
+            <button className="ar-btn-main" onClick={confirmArParams}>
+              写真に合わせる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 中心レティクル（注視点＝画面中央の目印）。ARでは撮影地点ピンを使うので出さない。 */}
+      {appMode === "simulation" && mode === "map" && showCenter && (
         <svg ref={reticleRef} className="center-reticle" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
           <circle cx="16" cy="16" r="8.5" fill="none" stroke="#8fe0ff" strokeWidth="1.6" />
           <circle cx="16" cy="16" r="1.5" fill="#8fe0ff" />
@@ -1173,15 +1319,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         <IconHome size={18} />
       </button>
 
-      {/* 地図⇄カメラ視点の切替（右上） */}
-      <button
-        className={`mode-toggle${mode === "camera" ? " is-camera" : ""}`}
-        title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
-        onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
-      >
-        {mode === "map" ? <IconCamera size={16} /> : <IconMap size={16} />}
-        <span>{mode === "map" ? "カメラ視点" : "地図に戻る"}</span>
-      </button>
+      {/* 地図⇄カメラ視点の切替（右上）。ARでは視点遷移をウィザードが担うので出さない。 */}
+      {appMode === "simulation" && (
+        <button
+          className={`mode-toggle${mode === "camera" ? " is-camera" : ""}`}
+          title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
+          onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
+        >
+          {mode === "map" ? <IconCamera size={16} /> : <IconMap size={16} />}
+          <span>{mode === "map" ? "カメラ視点" : "地図に戻る"}</span>
+        </button>
+      )}
 
 
       {/* 山頂選択の一括解除チップ（選択が1つ以上ある時だけ表示） */}
@@ -1238,8 +1386,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                       onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
                     />
                   </label>
-                  <button className="cam-photo-clear" title="写真を外す" onClick={clearPhoto}>
-                    写真を外す
+                  <button className="cam-photo-clear" title="別の写真でやり直す" onClick={restartAr}>
+                    別の写真
                   </button>
                 </div>
               )}
