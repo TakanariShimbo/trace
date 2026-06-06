@@ -22,6 +22,7 @@ import {
   IconSun,
   IconMoonPhase,
   IconImage,
+  IconChevron,
 } from "./icons";
 import {
   worldToLonLat,
@@ -1667,11 +1668,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <span className="ar-intro-icon">
             <IconImage size={34} />
           </span>
-          <h2>AR：写真から</h2>
+          <h2>写真に山名をのせる</h2>
           <p>
-            撮った写真を選ぶと、その撮影地点に立って3D地形と山名を重ねます。
+            撮った山の写真を選ぶと、その地点から見た山に名前を重ねられます。
             <br />
-            位置情報（GPS）があれば自動で、無ければ撮影地点を選んでもらいます。
+            位置情報（GPS）があれば自動で、無ければ撮影地点を選んでください。
           </p>
           <button className="ar-intro-pick" onClick={() => photoInputRef.current?.click()}>
             <IconImage size={16} />
@@ -1743,11 +1744,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           )}
           <div className="ar-bottom-bar">
             <button className="ar-btn-sub" onClick={backToParams}>
-              ← 向き・画角
+              <IconChevron dir="left" size={14} />
+              向き・画角
             </button>
             <span className="ar-select-count">選択 {peakSelCount} 山</span>
             <button className="ar-btn-main" onClick={goAlignFromSelect}>
-              微調整へ →
+              微調整へ
+              <IconChevron dir="right" size={14} />
             </button>
           </div>
         </>
@@ -1777,10 +1780,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </label>
             <div className="ar-aim-actions">
               <button className="ar-btn-sub" onClick={backToLocate}>
-                ← 撮影地点
+                <IconChevron dir="left" size={14} />
+                撮影地点
               </button>
               <button className="ar-btn-main" onClick={confirmArParams}>
-                山を選ぶ →
+                山を選ぶ
+                <IconChevron dir="right" size={14} />
               </button>
             </div>
           </div>
@@ -1839,11 +1844,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           <div className="ar-edit-bar">
             <button className="ar-btn-sub" onClick={backToAlignFromExport}>
-              ← 微調整
+              <IconChevron dir="left" size={14} />
+              微調整
             </button>
             <span className="ar-edit-hint">
               {arLabels.length > 0
-                ? `名札や点をドラッグで微調整（${arLabels.length}個）`
+                ? `名札や点をドラッグで位置を微調整（${arLabels.length}件）`
                 : "写真の枠内に山がありません。微調整で向きを合わせ直してください"}
             </span>
             <button
@@ -1851,6 +1857,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               disabled={arLabels.length === 0}
               onClick={downloadComposite}
             >
+              <IconDownload size={15} />
               ダウンロード
             </button>
           </div>
@@ -1981,10 +1988,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               </span>
               <div className="ar-phase-foot-row">
                 <button className="ar-btn-sub" onClick={backToSelect}>
-                  ← 山選択
+                  <IconChevron dir="left" size={14} />
+                  山選択
                 </button>
                 <button className="ar-btn-main" onClick={goExport}>
-                  書き出し →
+                  仕上げ
+                  <IconChevron dir="right" size={14} />
                 </button>
               </div>
             </div>

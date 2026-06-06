@@ -267,7 +267,7 @@ body,
   cursor: pointer;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 20;
+  z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)でも常に押せるように */
 }
 .home-btn:hover {
   background: rgba(28, 36, 48, 0.88);
@@ -288,7 +288,7 @@ body,
   cursor: pointer;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 20;
+  z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)でも常に押せるように */
 }
 .menu-toggle:hover {
   background: rgba(34, 46, 62, 0.85);
@@ -1224,7 +1224,10 @@ body,
   justify-content: flex-end;
 }
 .ar-btn-main {
-  padding: 11px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 20px;
   font-size: 14px;
   font-weight: 700;
   color: #fff;
@@ -1241,7 +1244,10 @@ body,
   cursor: default;
 }
 .ar-btn-sub {
-  padding: 11px 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 11px 16px;
   font-size: 13px;
   color: #e6edf5;
   background: rgba(28, 36, 48, 0.85);
@@ -1251,6 +1257,9 @@ body,
 }
 .ar-btn-sub:hover {
   background: rgba(40, 50, 66, 0.9);
+}
+.ar-btn-sub > svg {
+  opacity: 0.7;
 }
 
 /* 撮影情報フェーズ（中央パネル） */

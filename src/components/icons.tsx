@@ -60,6 +60,15 @@ export function IconImage({ size = 16, className }: Props) {
   );
 }
 
+/** 線のシェブロン（ボタンの前後ナビ用）。dir で左右。 */
+export function IconChevron({ dir = "right", size = 16, className }: Props & { dir?: "left" | "right" }) {
+  return (
+    <svg {...svgProps(size, className)}>
+      {dir === "right" ? <path d="M9.5 5 L16.5 12 L9.5 19" /> : <path d="M14.5 5 L7.5 12 L14.5 19" />}
+    </svg>
+  );
+}
+
 /** 三角キャレット（パン操作）。dir で向きを回す。 */
 export function IconCaret({ dir = "up", size = 16, className }: Props & { dir?: "up" | "down" | "left" | "right" }) {
   const rot = { up: 0, right: 90, down: 180, left: 270 }[dir];
