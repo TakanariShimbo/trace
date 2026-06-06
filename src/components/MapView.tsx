@@ -123,7 +123,7 @@ export default function MapView() {
   const [locError, setLocError] = useState<string | null>(null);
   // サイドバー開閉と、右下リモコンの表示。
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showRemote, setShowRemote] = useState(true);
+  const [showRemote, setShowRemote] = useState(false);
   // 中心マーカー（視点中心＝画面中央の目印）。画面中央のレティクルで表示する。
   const [showCenter, setShowCenter] = useState(true);
   // 空グラデーション表示。
