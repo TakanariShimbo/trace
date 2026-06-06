@@ -60,6 +60,58 @@ body,
   z-index: 5;
 }
 
+/* --- 山頂マーカーの選択ラベル（選択した山の名前） --- */
+.peak-label-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* ラベルは表示専用。地図操作・山頂タップを邪魔しない */
+  overflow: hidden;
+  z-index: 6;
+}
+.peak-label {
+  position: absolute;
+  /* (left,top) は点の画面位置。点の真上に少しずらして表示する。 */
+  transform: translate(-50%, calc(-100% - 10px));
+  white-space: nowrap;
+  padding: 2px 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1205;
+  background: rgba(255, 206, 74, 0.94);
+  border: 1px solid rgba(120, 90, 10, 0.5);
+  border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* --- 山頂選択の一括解除チップ（上中央） --- */
+.peak-clear {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 8px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(18, 24, 33, 0.82);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 20;
+}
+.peak-clear:hover {
+  background: rgba(34, 46, 62, 0.9);
+}
+.peak-clear b {
+  color: #ffce4a;
+  font-weight: 600;
+}
+
 /* --- 地図⇄カメラ視点トグル（右上） --- */
 .mode-toggle {
   position: absolute;

@@ -46,6 +46,18 @@ function toHiragana(s: string): string {
   return s.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
 }
 
+/** 全山頂を返す（山頂マーカー用）。データは一度ロードしてキャッシュ。 */
+export async function loadAllMountains(): Promise<MountainHit[]> {
+  const list = await load();
+  return list.map((m) => ({
+    name: m.name,
+    lat: m.latitude,
+    lon: m.longitude,
+    elevationM: m.elevation_m,
+    prefecture: m.prefecture,
+  }));
+}
+
 /** 名前・読みで部分一致。重要度(priority)→標高の順で並べ、上位 limit 件を返す。 */
 export async function searchMountains(query: string, limit = 12): Promise<MountainHit[]> {
   const list = await load();
