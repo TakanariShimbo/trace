@@ -142,6 +142,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     clearPeakSelection: () => void;
     getPeakSelection: () => { name: string; elevM: number; sx: number; sy: number }[]; // 書き出し用: 選択山の画面座標
     frameSelectView: (lon: number, lat: number, headingDeg: number) => void; // AR山選択: 撮影地点後方上空の俯瞰へ
+    setMapPanLocked: (on: boolean) => void; // AR山選択: パン禁止（回転・ズームは可）
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -533,8 +534,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       clearPeakSelection: () => {
         peaks.clearSelection(); // ラベルの選択強調は次フレームの updatePeakLabels で反映
       },
-      // AR山選択: 撮影地点の少し後ろ上空から heading 方向を見下ろす局所俯瞰へ即セット。
-      // 写真に写る前後の山が奥行きつきで見え、タップで選びやすい。
+      // AR山選択: 撮影地点（＝注視点）を中心に、その後ろ上空から heading 方向を見下ろす俯瞰へ。
+      // 引きすぎず撮影地点が分かる距離。パンは別途ロックして場所が動かないようにする。
       frameSelectView: (lon, lat, headingDeg) => {
         const ex = mercXToWorld(lonToMercX(lon));
         const ez = mercYToWorld(latToMercY(lat));
@@ -542,14 +543,19 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         const hr = (headingDeg * Math.PI) / 180;
         const fx = Math.sin(hr); // 前方(heading)の水平成分（X=東, Z=南, 北=-Z）
         const fz = -Math.cos(hr);
-        const BACK = 120; // 撮影地点の後ろへ引く距離(world)
-        const UP = 95; // 上空へ上げる高さ(world)
-        const AHEAD = 80; // 注視点を前方へ置く距離(world)
-        controls.target.set(ex + fx * AHEAD, h, ez + fz * AHEAD);
+        const BACK = 42; // 撮影地点の後ろへ引く距離(world)。引きすぎない
+        const UP = 34; // 上空へ上げる高さ(world)
+        controls.target.set(ex, h, ez); // 注視点＝撮影地点そのもの
         camera.position.set(ex - fx * BACK, h + UP, ez - fz * BACK);
         camera.up.set(0, 1, 0);
         flyGoal = null; // 進行中の fly を止める
         controls.update();
+      },
+      // AR山選択中: パン(場所移動)を禁止し、回転(アングル)とズームのみ許可。off で通常へ戻す。
+      setMapPanLocked: (on) => {
+        controls.enablePan = !on;
+        controls.mouseButtons.LEFT = on ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
+        controls.touches.ONE = on ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
       },
       // 書き出し用: 選択中の山頂を画面座標つきで返す（カメラ後方は除外）。
       getPeakSelection: () => {
@@ -1096,6 +1102,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const exitCameraMode = () => {
     apiRef.current?.exitCamera();
     apiRef.current?.setVerticalExaggeration(mapVex); // 地図用VEXへ戻す（地形再生成）
+    apiRef.current?.setMapPanLocked(false); // 地図は通常操作（パン可）に戻す
     setMode("map");
   };
 
@@ -1126,13 +1133,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       : CAM_FOV_DEFAULT;
     setArFovDeg(fov);
     if (exif.lat != null && exif.lon != null) {
-      const loc = { lat: exif.lat, lon: exif.lon };
-      placeArPoint(loc.lat, loc.lon);
-      if (hasFov) goAlign(loc, exif.headingDeg, fov); // 位置も画角も揃ってる → 一気に合わせる
-      else setArStep("params"); // 画角だけ聞く
-    } else {
-      setArStep("locate"); // 位置から指定してもらう
+      // EXIFに位置があってもスキップせず、推定地点へピンを置いて確認・微調整できるようにする。
+      placeArPoint(exif.lat, exif.lon);
+      apiRef.current?.flyTo({ lat: exif.lat, lon: exif.lon });
     }
+    setArStep("locate"); // 位置の確認/指定フェーズへ（EXIFありは確認、なしは指定）
   };
   // 撮影地点フェーズの「ここで決定」: 画角があれば合わせる、無ければ情報入力へ。
   const confirmArLocate = () => {
@@ -1160,8 +1165,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 合わせる(一人称)→山選択(3D俯瞰地図)。奥行きが見えてどの山が手前/奥か分かりやすい。
   // 地図モード中は camHeading/Pitch/Fov が変わらないので、合わせたポーズは状態に保たれる。
   const goSelect = () => {
-    exitCameraMode(); // 一人称→地図モードへ
-    if (arLoc) apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading); // 撮影地点後方の俯瞰へ
+    exitCameraMode(); // 一人称→地図モードへ（パンは一旦解除される）
+    if (arLoc) {
+      apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading); // 撮影地点中心の俯瞰へ
+      apiRef.current?.setMapPanLocked(true); // 場所は固定。回転・ズームのみ
+    }
     setArStep("select");
   };
   // 合わせたポーズ(状態に保持)で一人称へ復帰。
@@ -1251,7 +1259,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const backToSelectFromExport = () => {
     setArCompositeUrl(null);
     exitCameraMode();
-    if (arLoc) apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
+    if (arLoc) {
+      apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
+      apiRef.current?.setMapPanLocked(true);
+    }
     setArStep("select");
   };
   // 書き出した合成画像をダウンロード。
@@ -1406,7 +1417,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         <>
           <div className="ar-locate-hint">
             <IconPin size={15} />
-            <span>撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索</span>
+            <span>
+              {arLoc
+                ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
+                : "撮影地点を選んでください — 地図をタップ、またはメニュー（☰）で検索"}
+            </span>
           </div>
           <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
             <IconPin size={30} />
