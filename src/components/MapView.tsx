@@ -79,7 +79,10 @@ const MAP_FOV = 55;
 // カメラ視点の既定値。CAM_FOV_* は「横画角」(deg)。毎フレーム現在のアスペクト比から
 // 縦画角に換算して camera.fov へ入れる（ディスプレイ比が変わっても横の写りが一定）。
 const CAM_FOV_DEFAULT = 75; // 横画角の既定（一般的なスマホカメラ相当）
-const CAM_FOV_MIN = 30;
+// 横画角の下限は小さめに。縦持ち(縦長アスペクト)だと横固定により縦画角が広がるが、
+// 横を絞れば縦も比例して下がるので、下限を低くしておけばユーザー側で回避できる
+// （遠くの山を覗き込む望遠ズームとしても有用）。
+const CAM_FOV_MIN = 15;
 const CAM_FOV_MAX = 110;
 const CAM_PITCH_LIMIT = 80;
 const CAM_EYE_DEFAULT = 1.6; // 目線高さ(m, 地表から)
