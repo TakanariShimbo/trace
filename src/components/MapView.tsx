@@ -80,6 +80,12 @@ const VEX_MAP_DEFAULT = 1.7; // 地図モードの標高誇張
 const VEX_CAM_DEFAULT = 1.0; // カメラ視点モードの標高誇張（実寸）
 const CAM_CELESTIAL_R = 5000; // カメラ視点で太陽月を置く半径(ワールド≒遠方の空)
 
+// Date → <input type="date"> 用のローカル日付文字列 (YYYY-MM-DD)。
+function toDateInput(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 // 方位az(0=北,90=東)・仰角alt(0=水平) → 単位方向(X=東,Y=上,Z=南で北=-Z)。
 function dirAzAlt(azDeg: number, altDeg: number, out: THREE.Vector3): THREE.Vector3 {
   const a = (azDeg * Math.PI) / 180;
@@ -156,12 +162,16 @@ export default function MapView() {
   const [celestialOn, setCelestialOn] = useState(false);
   const [sunObserver, setSunObserver] = useState<LonLat | null>(null);
   // 現在時刻を中心(0)に、±12時間のオフセットで観測日時を作る。
-  const [baseTime, setBaseTime] = useState(() => new Date());
-  const [offsetMin, setOffsetMin] = useState(0);
-  const skyDate = useMemo(
-    () => new Date(baseTime.getTime() + offsetMin * 60000),
-    [baseTime, offsetMin],
-  );
+  // 日付（自由指定）＋時刻スライダー。既定は現在日時。
+  const [dateStr, setDateStr] = useState(() => toDateInput(new Date()));
+  const [minutes, setMinutes] = useState(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
+  const skyDate = useMemo(() => {
+    const [y, mo, da] = dateStr.split("-").map(Number);
+    return new Date(y, (mo || 1) - 1, da || 1, Math.floor(minutes / 60), minutes % 60);
+  }, [dateStr, minutes]);
   // 観測点＋日時から太陽月の状態（UI表示＆レイヤ反映に使う）。
   const skyInfo = useMemo<SkyState | null>(
     () => (celestialOn && sunObserver ? computeSky(skyDate, sunObserver.lat, sunObserver.lon) : null),
@@ -812,14 +822,13 @@ export default function MapView() {
     if (on && !sunObserver) setSunObserver(apiRef.current?.getCenter() ?? null);
   };
   const setSunNow = () => {
-    setBaseTime(new Date());
-    setOffsetMin(0);
+    const d = new Date();
+    setDateStr(toDateInput(d));
+    setMinutes(d.getHours() * 60 + d.getMinutes());
   };
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const fmtTime = (d: Date | null) => (d ? `${pad2(d.getHours())}:${pad2(d.getMinutes())}` : "—");
-  const fmtDateTime = (d: Date) =>
-    `${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  const offLabel = `${offsetMin >= 0 ? "+" : "−"}${Math.floor(Math.abs(offsetMin) / 60)}:${pad2(Math.abs(offsetMin) % 60)}`;
+  const hhmm = `${pad2(Math.floor(minutes / 60))}:${pad2(minutes % 60)}`;
 
   const secHead = (id: string, title: string) => (
     <button className="side-sec-head" onClick={() => toggleSec(id)} aria-expanded={openSec[id]}>
@@ -1051,10 +1060,6 @@ export default function MapView() {
 
           {celestialOn && (
             <>
-              <p className="save-note">
-                画面中央（見ている地点）を中心に地形を円盤で切り抜き、外周に太陽・月を表示します。
-                パン・ズームに追従します。
-              </p>
               {sunObserver && (
                 <div className="save-center">
                   中心: {sunObserver.lat.toFixed(4)}°, {sunObserver.lon.toFixed(4)}°
@@ -1062,19 +1067,27 @@ export default function MapView() {
               )}
 
               <label className="save-field">
-                <span>日時: {fmtDateTime(skyDate)}（現在 {offLabel}）</span>
+                <span>日付</span>
+                <input
+                  type="date"
+                  value={dateStr}
+                  onChange={(e) => setDateStr(e.target.value)}
+                />
+              </label>
+
+              <label className="save-field">
+                <span>時刻: {hhmm}</span>
                 <input
                   type="range"
-                  min={-720}
-                  max={720}
-                  step={5}
-                  value={offsetMin}
-                  onChange={(e) => setOffsetMin(Number(e.target.value))}
+                  min={0}
+                  max={1439}
+                  value={minutes}
+                  onChange={(e) => setMinutes(Number(e.target.value))}
                 />
               </label>
 
               <button className="save-link" onClick={setSunNow}>
-                現在時刻にリセット
+                現在日時にリセット
               </button>
 
               {skyInfo && (
