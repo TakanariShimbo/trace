@@ -106,6 +106,7 @@ export default function MapView() {
     setCamFov: (fov: number) => void;
     setCamEyeHeight: (m: number) => void;
     setVerticalExaggeration: (v: number) => void;
+    setSkySunDir: (x: number, y: number, z: number) => void;
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -373,6 +374,7 @@ export default function MapView() {
         applyVEX(v);
         terrain.rebuild(); // 標高はメッシュ頂点に焼き込み済みなので作り直し
       },
+      setSkySunDir: (x, y, z) => sunDirWorld.set(x, y, z),
     };
 
     // --- カメラ視点モードの見回し操作（ドラッグ＝向き / ホイール＝画角） --- //
@@ -501,12 +503,11 @@ export default function MapView() {
           celestialCenter.set(cam.eyeX, eyeY, cam.eyeZ);
           celestial.place(celestialCenter, CAM_CELESTIAL_R);
         }
-        // 空グラデーション（太陽位置に連動）。カメラ視点＋太陽月ON のとき。
-        skyDome.setVisible(celestialActive);
-        if (celestialActive) {
-          skyDome.setSunDir(sunDirWorld);
-          skyDome.place(camera.position);
-        }
+        // 空グラデーション（太陽位置に連動）。カメラ視点では常時表示。
+        // 太陽方向は 太陽月ON=選択時刻 / OFF=現在時刻（下の effect が sunDirWorld を更新）。
+        skyDome.setVisible(true);
+        skyDome.setSunDir(sunDirWorld);
+        skyDome.place(camera.position);
         terrain.update(camera, mount.clientHeight, 30);
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
@@ -632,6 +633,18 @@ export default function MapView() {
     api.setCelestialSky(skyInfo, sunTrack, moonTrack);
     api.setCelestialActive(true);
   }, [celestialOn, sunObserver, skyDate, skyInfo]);
+
+  // カメラ視点で太陽月OFFのときは、空の太陽方向を「現在時刻」で計算してセット。
+  // （太陽月ON のときは setCelestialSky が選択時刻で更新するのでここは何もしない）
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || mode !== "camera" || celestialOn) return;
+    const center = api.getCenter();
+    if (!center) return;
+    const sky = computeSky(new Date(), center.lat, center.lon);
+    const d = dirAzAlt(sky.sun.azimuthDeg, sky.sun.altitudeDeg, new THREE.Vector3());
+    api.setSkySunDir(d.x, d.y, d.z);
+  }, [mode, celestialOn]);
 
   // --- 画面ボタンのプレス/リリース --- //
   const start = (patch: Partial<Nav>) => (e: React.PointerEvent) => {
