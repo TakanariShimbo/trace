@@ -392,32 +392,46 @@ export default function MapView() {
       setSkySunDir: (x, y, z) => sunDirWorld.set(x, y, z),
     };
 
-    // --- カメラ視点モードの見回し操作（ドラッグ＝向き / ホイール＝画角） --- //
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
+    // --- カメラ視点の見回し操作（1本指=向き / 2本指ピンチ=画角 / ホイール=画角） --- //
+    const pointers = new Map<number, { x: number; y: number }>();
+    let pinchDist = 0;
+    const pinchDistance = (): number => {
+      const pts = [...pointers.values()];
+      return pts.length >= 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    };
     const onCamDown = (e: PointerEvent) => {
       if (!cameraMode) return;
-      dragging = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) pinchDist = pinchDistance();
     };
     const onCamMove = (e: PointerEvent) => {
-      if (!cameraMode || !dragging) return;
-      const degPerPx = cam.fov / mount.clientHeight; // ズーム(小fov)ほど感度を下げる
-      cam.heading = (cam.heading - (e.clientX - lastX) * degPerPx + 360) % 360;
-      cam.pitch = THREE.MathUtils.clamp(
-        cam.pitch + (e.clientY - lastY) * degPerPx,
-        -CAM_PITCH_LIMIT,
-        CAM_PITCH_LIMIT,
-      );
-      lastX = e.clientX;
-      lastY = e.clientY;
-      setCamHeading(cam.heading);
-      setCamPitch(cam.pitch);
+      if (!cameraMode) return;
+      const p = pointers.get(e.pointerId);
+      if (!p) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      p.x = e.clientX;
+      p.y = e.clientY;
+      if (pointers.size >= 2) {
+        // 2本指ピンチ＝画角。指を開く(距離↑)=ズームイン=fov減。
+        const d = pinchDistance();
+        if (pinchDist > 0 && d > 0) {
+          cam.fov = THREE.MathUtils.clamp(cam.fov * (pinchDist / d), CAM_FOV_MIN, CAM_FOV_MAX);
+          setCamFov(cam.fov);
+        }
+        pinchDist = d;
+      } else {
+        // 1本指＝向き（ズーム(小fov)ほど感度を下げる）。
+        const degPerPx = cam.fov / mount.clientHeight;
+        cam.heading = (cam.heading - dx * degPerPx + 360) % 360;
+        cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * degPerPx, -CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
+        setCamHeading(cam.heading);
+        setCamPitch(cam.pitch);
+      }
     };
-    const onCamUp = () => {
-      dragging = false;
+    const onCamUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+      pinchDist = 0; // 残り1本になったら次の move で再計算
     };
     const onCamWheel = (e: WheelEvent) => {
       if (!cameraMode) return;
@@ -428,6 +442,7 @@ export default function MapView() {
     renderer.domElement.addEventListener("pointerdown", onCamDown);
     window.addEventListener("pointermove", onCamMove);
     window.addEventListener("pointerup", onCamUp);
+    window.addEventListener("pointercancel", onCamUp);
     renderer.domElement.addEventListener("wheel", onCamWheel, { passive: false });
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
@@ -595,6 +610,7 @@ export default function MapView() {
       renderer.domElement.removeEventListener("pointerdown", onCamDown);
       window.removeEventListener("pointermove", onCamMove);
       window.removeEventListener("pointerup", onCamUp);
+      window.removeEventListener("pointercancel", onCamUp);
       renderer.domElement.removeEventListener("wheel", onCamWheel);
       ro.disconnect();
       apiRef.current = null;
