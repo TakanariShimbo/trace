@@ -252,9 +252,12 @@ export default function MapView() {
     const dirTmp = new THREE.Vector3();
     const camRay = new THREE.Raycaster();
     const DOWN = new THREE.Vector3(0, -1, 0);
+    const rayOrigin = new THREE.Vector3();
+    const reticleWorld = new THREE.Vector3();
     const sampleSurfaceY = (x: number, z: number): number => {
       // 観測点の上空から真下へレイし、表示中の地形メッシュ表面の高さを得る。
-      camRay.set(new THREE.Vector3(x, 9000, z), DOWN);
+      rayOrigin.set(x, 9000, z);
+      camRay.set(rayOrigin, DOWN);
       const hits = camRay.intersectObjects(terrain.group.children, false);
       return hits.length ? hits[0].point.y : 0;
     };
@@ -546,11 +549,13 @@ export default function MapView() {
         terrain.update(camera, mount.clientHeight, camDist);
       }
 
-      // 中心レティクルは「マップの中心」(注視点。フリー中は凍結した中心)を画面に投影して追従。
+      // 中心レティクルは「マップの中心」を、その地点の地形表面の高さに置いて画面投影。
+      // （Y=0の海面ではなく地表に合わせる＝斜め視点でも山頂などにピタリ合う）
       const reticle = reticleRef.current;
       if (reticle) {
         const mc = freeLookActive && savedPose ? savedPose.target : controls.target;
-        projTmp.copy(mc).project(camera);
+        reticleWorld.set(mc.x, sampleSurfaceY(mc.x, mc.z), mc.z);
+        projTmp.copy(reticleWorld).project(camera);
         if (projTmp.z <= 1) {
           reticle.style.display = "block";
           reticle.style.left = `${(projTmp.x * 0.5 + 0.5) * mount.clientWidth}px`;
