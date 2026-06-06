@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { QuadtreeTerrain } from "../terrain/QuadtreeTerrain";
 import { CelestialLayer } from "../terrain/CelestialLayer";
+import { SkyDome } from "../terrain/SkyDome";
 import { computeSky, computeTrack, type SkyState, type SkyBody } from "../lib/celestial";
 import {
   IconMountain,
@@ -14,6 +15,8 @@ import {
   IconPlus,
   IconMinus,
   IconLocate,
+  IconCamera,
+  IconMap,
 } from "./icons";
 import {
   worldToLonLat,
@@ -21,6 +24,8 @@ import {
   latToMercY,
   mercXToWorld,
   mercYToWorld,
+  elevToWorldY,
+  setVerticalExaggeration as applyVEX,
 } from "../lib/mercator";
 import {
   BASEMAPS,
@@ -65,6 +70,23 @@ const RADIUS_MIN = 1;
 const RADIUS_MAX = 50;
 const RADIUS_DEFAULT = 8;
 
+// カメラ視点の既定値。
+const CAM_FOV_DEFAULT = 55;
+const CAM_FOV_MIN = 20;
+const CAM_FOV_MAX = 90;
+const CAM_PITCH_LIMIT = 80;
+const CAM_EYE_DEFAULT = 1.6; // 目線高さ(m, 地表から)
+const VEX_MAP_DEFAULT = 1.7; // 地図モードの標高誇張
+const VEX_CAM_DEFAULT = 1.0; // カメラ視点モードの標高誇張（実寸）
+const CAM_CELESTIAL_R = 5000; // カメラ視点で太陽月を置く半径(ワールド≒遠方の空)
+
+// 方位az(0=北,90=東)・仰角alt(0=水平) → 単位方向(X=東,Y=上,Z=南で北=-Z)。
+function dirAzAlt(azDeg: number, altDeg: number, out: THREE.Vector3): THREE.Vector3 {
+  const a = (azDeg * Math.PI) / 180;
+  const e = (altDeg * Math.PI) / 180;
+  return out.set(Math.cos(e) * Math.sin(a), Math.sin(e), -Math.cos(e) * Math.cos(a));
+}
+
 export default function MapView() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   // 画面ボタンとレンダリングループで共有する操作状態（.current は callback/effect 内でのみ触る）。
@@ -78,6 +100,13 @@ export default function MapView() {
     setCelestialActive: (on: boolean) => void;
     setCelestialSky: (sky: SkyState | null, sunTrack: SkyBody[], moonTrack: SkyBody[]) => void;
     setFreeLook: (on: boolean) => void;
+    enterCamera: (eyeHeightM: number) => { heading: number; pitch: number; fov: number };
+    exitCamera: () => void;
+    setCamLook: (heading: number, pitch: number) => void;
+    setCamFov: (fov: number) => void;
+    setCamEyeHeight: (m: number) => void;
+    setVerticalExaggeration: (v: number) => void;
+    setSkySunDir: (x: number, y: number, z: number) => void;
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -94,11 +123,24 @@ export default function MapView() {
   const [locError, setLocError] = useState<string | null>(null);
   // サイドバー開閉と、右下リモコンの表示。
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showRemote, setShowRemote] = useState(true);
+  const [showRemote, setShowRemote] = useState(false);
   // 中心マーカー（視点中心＝画面中央の目印）。画面中央のレティクルで表示する。
   const [showCenter, setShowCenter] = useState(true);
+  // 空グラデーション表示。
+  const [showSky, setShowSky] = useState(true);
+  const showSkyRef = useRef(true);
   // 視点フリーモード（解像度・太陽月・円盤を凍結して視点だけ動かす）。
   const [freeLook, setFreeLook] = useState(false);
+  // 標高の誇張（×1=実寸 1:1:1）。モードごとに既定が異なる（地図1.7 / カメラ1.0）。
+  const [mapVex, setMapVex] = useState(VEX_MAP_DEFAULT);
+  const [camVex, setCamVex] = useState(VEX_CAM_DEFAULT);
+
+  // --- カメラ視点モード（3Dマップを一人称カメラとして使う） --- //
+  const [mode, setMode] = useState<"map" | "camera">("map");
+  const [camHeading, setCamHeading] = useState(0);
+  const [camPitch, setCamPitch] = useState(0);
+  const [camFov, setCamFov] = useState(CAM_FOV_DEFAULT);
+  const [camEyeHeight, setCamEyeHeight] = useState(CAM_EYE_DEFAULT);
   // サイドバー各セクションの開閉（よく使う検索・地図は既定で開く）。
   const [openSec, setOpenSec] = useState<Record<string, boolean>>({
     search: true,
@@ -192,11 +234,30 @@ export default function MapView() {
     const celestialCenter = new THREE.Vector3();
     let lastObsWorld: THREE.Vector2 | null = null; // 直近に sky を計算した中心(world XZ)
 
+    // 太陽位置に連動する空グラデーション（カメラ視点の背景）。
+    const skyDome = new SkyDome();
+    scene.add(skyDome.mesh);
+    const sunDirWorld = new THREE.Vector3(0, 1, 0); // 直近の太陽方向（setCelestialSky で更新）
+
     // 視点フリーモード: ON の間は地形LOD・円盤・太陽月を凍結し、カメラだけ動かせる。
     // OFF にしたら、ON にした瞬間の視点へ戻す。
     let freeLookActive = false;
     let savedPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
     const projTmp = new THREE.Vector3(); // 中心点の画面投影用
+
+    // --- カメラ視点モード --- //
+    let cameraMode = false;
+    let mapPose: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+    const cam = { heading: 0, pitch: 0, fov: CAM_FOV_DEFAULT, eyeX: 0, eyeZ: 0, groundElevM: 0, eyeHeightM: CAM_EYE_DEFAULT };
+    const dirTmp = new THREE.Vector3();
+    const camRay = new THREE.Raycaster();
+    const DOWN = new THREE.Vector3(0, -1, 0);
+    const sampleSurfaceY = (x: number, z: number): number => {
+      // 観測点の上空から真下へレイし、表示中の地形メッシュ表面の高さを得る。
+      camRay.set(new THREE.Vector3(x, 9000, z), DOWN);
+      const hits = camRay.intersectObjects(terrain.group.children, false);
+      return hits.length ? hits[0].point.y : 0;
+    };
 
     // --- 事前ロード範囲（中心＋半径）のプレビュー円。地形に隠れないよう常に手前に描く --- //
     const ringPts: THREE.Vector3[] = [];
@@ -258,7 +319,10 @@ export default function MapView() {
           lastObsWorld = null;
         }
       },
-      setCelestialSky: (sky, sunTrack, moonTrack) => celestial.setSky(sky, sunTrack, moonTrack),
+      setCelestialSky: (sky, sunTrack, moonTrack) => {
+        celestial.setSky(sky, sunTrack, moonTrack);
+        if (sky) dirAzAlt(sky.sun.azimuthDeg, sky.sun.altitudeDeg, sunDirWorld);
+      },
       setFreeLook: (on) => {
         if (on) {
           savedPose = { pos: camera.position.clone(), target: controls.target.clone() };
@@ -271,7 +335,88 @@ export default function MapView() {
           }
         }
       },
+      enterCamera: (eyeHeightM) => {
+        mapPose = { pos: camera.position.clone(), target: controls.target.clone() };
+        cam.eyeX = controls.target.x;
+        cam.eyeZ = controls.target.z;
+        // 地表のワールドYを実標高(m)に戻して保持（VEX変更にも追従できる）。
+        cam.groundElevM = sampleSurfaceY(cam.eyeX, cam.eyeZ) / Math.max(1e-9, elevToWorldY(1));
+        cam.eyeHeightM = eyeHeightM;
+        camera.getWorldDirection(dirTmp); // 初期方位＝今の水平向き
+        cam.heading = ((Math.atan2(dirTmp.x, -dirTmp.z) * 180) / Math.PI + 360) % 360;
+        cam.pitch = 0;
+        cam.fov = CAM_FOV_DEFAULT;
+        terrain.setClip(null, 0); // 円盤クリップ解除（カメラ視点は切り抜かない）
+        cameraMode = true;
+        controls.enabled = false;
+        return { heading: cam.heading, pitch: cam.pitch, fov: cam.fov };
+      },
+      exitCamera: () => {
+        cameraMode = false;
+        controls.enabled = true;
+        if (mapPose) {
+          camera.position.copy(mapPose.pos);
+          controls.target.copy(mapPose.target);
+          mapPose = null;
+        }
+        camera.fov = CAM_FOV_DEFAULT;
+        camera.updateProjectionMatrix();
+        controls.update();
+      },
+      setCamLook: (heading, pitch) => {
+        cam.heading = heading;
+        cam.pitch = pitch;
+      },
+      setCamFov: (fov) => {
+        cam.fov = fov;
+      },
+      setCamEyeHeight: (m) => {
+        cam.eyeHeightM = m;
+      },
+      setVerticalExaggeration: (v) => {
+        applyVEX(v);
+        terrain.rebuild(); // 標高はメッシュ頂点に焼き込み済みなので作り直し
+      },
+      setSkySunDir: (x, y, z) => sunDirWorld.set(x, y, z),
     };
+
+    // --- カメラ視点モードの見回し操作（ドラッグ＝向き / ホイール＝画角） --- //
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    const onCamDown = (e: PointerEvent) => {
+      if (!cameraMode) return;
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+    };
+    const onCamMove = (e: PointerEvent) => {
+      if (!cameraMode || !dragging) return;
+      const degPerPx = cam.fov / mount.clientHeight; // ズーム(小fov)ほど感度を下げる
+      cam.heading = (cam.heading - (e.clientX - lastX) * degPerPx + 360) % 360;
+      cam.pitch = THREE.MathUtils.clamp(
+        cam.pitch + (e.clientY - lastY) * degPerPx,
+        -CAM_PITCH_LIMIT,
+        CAM_PITCH_LIMIT,
+      );
+      lastX = e.clientX;
+      lastY = e.clientY;
+      setCamHeading(cam.heading);
+      setCamPitch(cam.pitch);
+    };
+    const onCamUp = () => {
+      dragging = false;
+    };
+    const onCamWheel = (e: WheelEvent) => {
+      if (!cameraMode) return;
+      e.preventDefault();
+      cam.fov = THREE.MathUtils.clamp(cam.fov + Math.sign(e.deltaY) * 3, CAM_FOV_MIN, CAM_FOV_MAX);
+      setCamFov(cam.fov);
+    };
+    renderer.domElement.addEventListener("pointerdown", onCamDown);
+    window.addEventListener("pointermove", onCamMove);
+    window.addEventListener("pointerup", onCamUp);
+    renderer.domElement.addEventListener("wheel", onCamWheel, { passive: false });
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
     const UP = new THREE.Vector3(0, 1, 0);
@@ -344,14 +489,47 @@ export default function MapView() {
 
     let raf = 0;
     const loop = () => {
+      if (cameraMode) {
+        // カメラ視点：視点位置に固定し、heading/pitch/fov で向きと画角を作る。
+        const eyeY = elevToWorldY(cam.groundElevM + cam.eyeHeightM);
+        camera.position.set(cam.eyeX, eyeY, cam.eyeZ);
+        dirAzAlt(cam.heading, cam.pitch, dirTmp);
+        camera.lookAt(cam.eyeX + dirTmp.x, eyeY + dirTmp.y, cam.eyeZ + dirTmp.z);
+        if (camera.fov !== cam.fov) {
+          camera.fov = cam.fov;
+          camera.updateProjectionMatrix();
+        }
+        if (reticleRef.current) reticleRef.current.style.display = "none";
+        // 太陽・月：カメラ視点では切り抜かず、視点(目)を中心に遠方の空へ配置。
+        if (celestialActive) {
+          celestial.setHorizonVisible(false);
+          celestialCenter.set(cam.eyeX, eyeY, cam.eyeZ);
+          celestial.place(celestialCenter, CAM_CELESTIAL_R);
+        }
+        // 空グラデーション（太陽位置に連動）。表示トグルで切替。
+        // 太陽方向は 太陽月ON=選択時刻 / OFF=現在時刻（下の effect が sunDirWorld を更新）。
+        skyDome.setVisible(showSkyRef.current);
+        skyDome.setSunDir(sunDirWorld);
+        skyDome.place(camera.position);
+        terrain.update(camera, mount.clientHeight, 30);
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+
       applyNav();
       controls.update();
       const camDist = camera.position.distanceTo(controls.target);
+      // 空グラデーション（地図モードでも傾ければ見える。表示トグルで切替）。
+      skyDome.setVisible(showSkyRef.current);
+      skyDome.setSunDir(sunDirWorld);
+      skyDome.place(camera.position);
       // 視点フリー中は、地形LOD・円盤・太陽月の連動を凍結（カメラだけ動かす）。
       if (!freeLookActive) {
         // 円盤クリップは terrain.update より前に設定（refine が当該フレームの半径を使う）。
         if (celestialActive) {
           // 中心＝視点中心。半径＝カメラ距離連動。パン・ズームに円盤と太陽月が追従。
+          celestial.setHorizonVisible(true);
           const tx = controls.target.x;
           const tz = controls.target.z;
           celestialCenter.set(tx, controls.target.y, tz);
@@ -400,11 +578,16 @@ export default function MapView() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      renderer.domElement.removeEventListener("pointerdown", onCamDown);
+      window.removeEventListener("pointermove", onCamMove);
+      window.removeEventListener("pointerup", onCamUp);
+      renderer.domElement.removeEventListener("wheel", onCamWheel);
       ro.disconnect();
       apiRef.current = null;
       previewRing.geometry.dispose();
       (previewRing.material as THREE.Material).dispose();
       celestial.dispose();
+      skyDome.dispose();
       controls.dispose();
       terrain.dispose();
       renderer.dispose();
@@ -428,6 +611,11 @@ export default function MapView() {
   useEffect(() => {
     apiRef.current?.setBasemap(basemapById(basemapId));
   }, [basemapId]);
+
+  // 空グラデーション表示の切替（ループから参照する ref に同期）。
+  useEffect(() => {
+    showSkyRef.current = showSky;
+  }, [showSky]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
   useEffect(() => {
@@ -456,6 +644,18 @@ export default function MapView() {
     api.setCelestialSky(skyInfo, sunTrack, moonTrack);
     api.setCelestialActive(true);
   }, [celestialOn, sunObserver, skyDate, skyInfo]);
+
+  // 太陽月OFFのときは、空の太陽方向を「現在時刻」で計算してセット（地図・カメラ共通）。
+  // （太陽月ON のときは setCelestialSky が選択時刻で更新するのでここは何もしない）
+  useEffect(() => {
+    const api = apiRef.current;
+    if (!api || celestialOn) return;
+    const center = api.getCenter();
+    if (!center) return;
+    const sky = computeSky(new Date(), center.lat, center.lon);
+    const d = dirAzAlt(sky.sun.azimuthDeg, sky.sun.altitudeDeg, new THREE.Vector3());
+    api.setSkySunDir(d.x, d.y, d.z);
+  }, [mode, celestialOn]);
 
   // --- 画面ボタンのプレス/リリース --- //
   const start = (patch: Partial<Nav>) => (e: React.PointerEvent) => {
@@ -560,6 +760,42 @@ export default function MapView() {
     apiRef.current?.setFreeLook(nv);
   };
 
+  // カメラ視点モードへ（太陽月は維持。自由視点はマップ専用なのでオフにしてから入る）。
+  const enterCameraMode = () => {
+    if (freeLook) {
+      setFreeLook(false);
+      apiRef.current?.setFreeLook(false);
+    }
+    const init = apiRef.current?.enterCamera(camEyeHeight); // 地表高さは現在(地図VEX)で取得
+    if (init) {
+      setCamHeading(init.heading);
+      setCamPitch(init.pitch);
+      setCamFov(init.fov);
+    }
+    apiRef.current?.setVerticalExaggeration(camVex); // カメラ用VEXへ（地形再生成）
+    setMode("camera");
+  };
+  const exitCameraMode = () => {
+    apiRef.current?.exitCamera();
+    apiRef.current?.setVerticalExaggeration(mapVex); // 地図用VEXへ戻す（地形再生成）
+    setMode("map");
+  };
+  // 現在モードの標高誇張を変更（モードごとに記憶）。
+  const activeVex = mode === "camera" ? camVex : mapVex;
+  const changeVex = (v: number) => {
+    if (mode === "camera") setCamVex(v);
+    else setMapVex(v);
+    apiRef.current?.setVerticalExaggeration(v);
+  };
+  const changeCamEyeHeight = (m: number) => {
+    setCamEyeHeight(m);
+    apiRef.current?.setCamEyeHeight(m);
+  };
+  const compass = (deg: number) => {
+    const dirs = ["北", "北東", "東", "南東", "南", "南西", "西", "北西"];
+    return dirs[Math.round(((deg % 360) / 45)) % 8];
+  };
+
   // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
   const goHome = () => {
     if (homeLocRef.current) apiRef.current?.flyTo(homeLocRef.current);
@@ -601,7 +837,7 @@ export default function MapView() {
       <div className="mapview-canvas" ref={mountRef} />
 
       {/* 中心レティクル（注視点＝画面中央の目印） */}
-      {showCenter && (
+      {mode === "map" && showCenter && (
         <svg ref={reticleRef} className="center-reticle" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
           <circle cx="16" cy="16" r="8.5" fill="none" stroke="#8fe0ff" strokeWidth="1.6" />
           <circle cx="16" cy="16" r="1.5" fill="#8fe0ff" />
@@ -622,14 +858,37 @@ export default function MapView() {
         ☰
       </button>
 
-      {/* 自由視点（解像度・太陽月を凍結して視点だけ動かす。解除でモード前の視点へ戻る） */}
+      {/* 地図⇄カメラ視点の切替（右上） */}
       <button
-        className={`freelook-toggle${freeLook ? " is-active" : ""}`}
-        title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
-        onClick={toggleFreeLook}
+        className={`mode-toggle${mode === "camera" ? " is-camera" : ""}`}
+        title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
+        onClick={mode === "map" ? enterCameraMode : exitCameraMode}
       >
-        {freeLook ? "自由視点：ON" : "自由視点"}
+        {mode === "map" ? <IconCamera size={16} /> : <IconMap size={16} />}
+        <span>{mode === "map" ? "カメラ視点" : "地図に戻る"}</span>
       </button>
+
+      {/* カメラ視点モードのHUD（下） */}
+      {mode === "camera" && (
+        <div className="cam-hud">
+          <div className="cam-readout">
+            <span>方位 {compass(camHeading)} {Math.round(camHeading)}°</span>
+            <span>仰角 {Math.round(camPitch)}°</span>
+            <span>画角 {Math.round(camFov)}°</span>
+          </div>
+          <label className="cam-eye">
+            <span>目線高さ {camEyeHeight} m</span>
+            <input
+              type="range"
+              min={1}
+              max={200}
+              value={camEyeHeight}
+              onChange={(e) => changeCamEyeHeight(Number(e.target.value))}
+            />
+          </label>
+          <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
+        </div>
+      )}
 
       {/* サイドバー背景（タップで閉じる） */}
       {sidebarOpen && <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
@@ -749,6 +1008,28 @@ export default function MapView() {
               onChange={(e) => setShowCenter(e.target.checked)}
             />
             <span>中心マーカーを表示</span>
+          </label>
+          <label className="side-toggle">
+            <input
+              type="checkbox"
+              checked={showSky}
+              onChange={(e) => setShowSky(e.target.checked)}
+            />
+            <span>空のグラデーションを表示</span>
+          </label>
+          <label className="save-field">
+            <span>
+              標高の誇張（{mode === "camera" ? "カメラ" : "地図"}）: ×{activeVex.toFixed(1)}
+              {activeVex === 1 ? "（実寸 1:1:1）" : ""}
+            </span>
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={activeVex}
+              onChange={(e) => changeVex(Number(e.target.value))}
+            />
           </label>
         </section>
 
@@ -913,9 +1194,11 @@ export default function MapView() {
         </section>
       </aside>
 
-      {/* カメラ操作リモコン（右下、表示切替可） */}
-      {showRemote && (
-        <div className="nav-controls">
+      {/* 右下クラスタ（マップモードのみ）: リモコン＋その下に自由視点 */}
+      {mode === "map" && (
+        <div className="controls-br">
+          {showRemote && (
+            <div className="nav-controls">
           <div className="nav-row">
             <button className="nav-btn" title="水平に近づける" {...hold({ tilt: 1 }, "tilt")}>
               <span className="nav-ico nav-ico--tilt-up" />
@@ -957,6 +1240,16 @@ export default function MapView() {
               <IconMinus />
             </button>
           </div>
+            </div>
+          )}
+          {/* 自由視点（リモコンの下） */}
+          <button
+            className={`freelook-toggle${freeLook ? " is-active" : ""}`}
+            title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
+            onClick={toggleFreeLook}
+          >
+            {freeLook ? "自由視点：ON" : "自由視点"}
+          </button>
         </div>
       )}
 

@@ -60,6 +60,77 @@ body,
   z-index: 5;
 }
 
+/* --- 地図⇄カメラ視点トグル（右上） --- */
+.mode-toggle {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 8px));
+  right: max(8px, env(safe-area-inset-right, 8px));
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 42px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: #e6edf5;
+  background: rgba(18, 24, 33, 0.78);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 20;
+}
+.mode-toggle:hover {
+  background: rgba(34, 46, 62, 0.85);
+}
+.mode-toggle.is-camera {
+  background: rgba(48, 100, 160, 0.92);
+  border-color: rgba(120, 180, 240, 0.65);
+  color: #fff;
+}
+
+/* --- カメラ視点HUD（下中央） --- */
+.cam-hud {
+  position: absolute;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  color: #e6edf5;
+  background: rgba(14, 19, 27, 0.86);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.cam-readout {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cam-eye {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #cdd6e2;
+}
+.cam-eye input[type="range"] {
+  width: 100%;
+  accent-color: #4f86c6;
+}
+.cam-hint {
+  font-size: 11px;
+  color: #8fa2bb;
+  text-align: center;
+}
+
 /* --- メニュー開閉ボタン（左上） --- */
 .menu-toggle {
   position: absolute;
@@ -81,14 +152,12 @@ body,
   background: rgba(34, 46, 62, 0.85);
 }
 
-/* 自由視点切替（右上） */
+/* 自由視点切替（右下クラスタ内・リモコンの下） */
 .freelook-toggle {
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 8px));
-  right: max(8px, env(safe-area-inset-right, 8px));
-  height: 42px;
+  height: 38px;
   padding: 0 14px;
   font-size: 13px;
+  white-space: nowrap;
   color: #e6edf5;
   background: rgba(18, 24, 33, 0.78);
   border: 1px solid rgba(130, 150, 175, 0.28);
@@ -371,11 +440,20 @@ body,
   border-color: rgba(120, 180, 240, 0.6);
 }
 
-/* --- 画面ナビゲーション操作ボタン（右下） --- */
-.nav-controls {
+/* --- 右下クラスタ（リモコン＋自由視点） --- */
+.controls-br {
   position: absolute;
   right: max(10px, env(safe-area-inset-right, 10px));
   bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 15;
+}
+
+/* --- 画面ナビゲーション操作ボタン（リモコン） --- */
+.nav-controls {
   display: flex;
   flex-direction: column;
   align-items: center;

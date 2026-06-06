@@ -28,6 +28,7 @@ export class CelestialLayer {
   private bodies = new THREE.Group();
   private tracks = new THREE.Group();
   private moonLight: THREE.DirectionalLight;
+  private horizon: THREE.LineLoop;
 
   constructor() {
     this.group.visible = false;
@@ -45,15 +46,20 @@ export class CelestialLayer {
       const t = (i / 96) * Math.PI * 2;
       ring.push(new THREE.Vector3(Math.cos(t) * BASE_R, 0, Math.sin(t) * BASE_R));
     }
-    const horizon = new THREE.LineLoop(
+    this.horizon = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(ring),
-      new THREE.LineBasicMaterial({ color: 0x46566e, transparent: true, opacity: 0.45 }),
+      new THREE.LineBasicMaterial({ color: 0x46566e, transparent: true, opacity: 0.45, fog: false }),
     );
-    this.group.add(horizon);
+    this.group.add(this.horizon);
   }
 
   setVisible(v: boolean): void {
     this.group.visible = v;
+  }
+
+  /** 地平線リングの表示切替（カメラ視点では隠す）。 */
+  setHorizonVisible(v: boolean): void {
+    this.horizon.visible = v;
   }
 
   /** 観測点(world)を中心に置き、ドーム半径(ワールド)でスケール。毎フレーム呼ぶ。 */
@@ -72,12 +78,12 @@ export class CelestialLayer {
     if (sky.sun.visible) {
       const sun = new THREE.Mesh(
         new THREE.SphereGeometry(4.5, 24, 16),
-        new THREE.MeshBasicMaterial({ color: SUN_COLOR }),
+        new THREE.MeshBasicMaterial({ color: SUN_COLOR, fog: false }),
       );
       sun.position.copy(dirFromAzAlt(sky.sun.azimuthDeg, sky.sun.altitudeDeg)).multiplyScalar(BASE_R);
       const glow = new THREE.Mesh(
         new THREE.SphereGeometry(7.5, 24, 16),
-        new THREE.MeshBasicMaterial({ color: SUN_COLOR, transparent: true, opacity: 0.22 }),
+        new THREE.MeshBasicMaterial({ color: SUN_COLOR, transparent: true, opacity: 0.22, fog: false }),
       );
       glow.position.copy(sun.position);
       this.bodies.add(sun, glow);
@@ -93,6 +99,7 @@ export class CelestialLayer {
           metalness: 0,
           transparent: true,
           opacity: 0.95,
+          fog: false,
         }),
       );
       moon.layers.set(1);
@@ -128,7 +135,7 @@ export class CelestialLayer {
         geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
         const line = new THREE.Line(
           geo,
-          new THREE.LineDashedMaterial({ vertexColors: true, dashSize: 2.5, gapSize: 2.5, transparent: true }),
+          new THREE.LineDashedMaterial({ vertexColors: true, dashSize: 2.5, gapSize: 2.5, transparent: true, fog: false }),
         );
         line.computeLineDistances();
         this.tracks.add(line);

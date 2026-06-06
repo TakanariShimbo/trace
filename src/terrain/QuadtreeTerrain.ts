@@ -127,6 +127,11 @@ export class QuadtreeTerrain {
   setBasemap(basemap: Basemap): void {
     if (basemap.id === this.basemap.id) return;
     this.basemap = basemap;
+    this.rebuild();
+  }
+
+  /** 全タイルを作り直す（メッシュ破棄→再ロード）。標高誇張やベースマップ変更時に使う。 */
+  rebuild(): void {
     this.gen++;
     this.pending.clear();
     this.shown.clear();

@@ -113,6 +113,28 @@ export function IconMinus({ size = 18, className }: Props) {
   );
 }
 
+/** カメラ。 */
+export function IconCamera({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <rect x="3" y="7" width="18" height="12" rx="2" />
+      <path d="M8.5 7 L10 4.8 H14 L15.5 7" />
+      <circle cx="12" cy="13" r="3.1" />
+    </svg>
+  );
+}
+
+/** 地図（折り畳み地図）。 */
+export function IconMap({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M9 4 L3 6 V20 L9 18 L15 20 L21 18 V4 L15 6 L9 4 Z" />
+      <path d="M9 4 V18" />
+      <path d="M15 6 V20" />
+    </svg>
+  );
+}
+
 /** 現在地（GPSロケート）。十字＋中心の的。 */
 export function IconLocate({ size = 16, className }: Props) {
   return (

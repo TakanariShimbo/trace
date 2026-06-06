@@ -19,8 +19,16 @@ const MERC_MAX = Math.PI * MERC_R; // 20037508.342789244
 export const ORIGIN_LAT = 36;
 export const ORIGIN_LON = 137.5;
 
-// 標高の強調倍率。1=実スケール。広域では山が潰れて見えるので既定で少し強調する。
-export const VERTICAL_EXAGGERATION = 1.7;
+// 標高の強調倍率。1=実スケール(X/Y/Z等倍)。広域では山が潰れて見えるので既定で少し強調。
+// 実行時に変更可能（サイドバーのスライダー）。変更後は地形メッシュの作り直しが必要。
+export const VERTICAL_EXAGGERATION_DEFAULT = 1.7;
+let verticalExaggeration = VERTICAL_EXAGGERATION_DEFAULT;
+export function setVerticalExaggeration(v: number): void {
+  verticalExaggeration = v;
+}
+export function getVerticalExaggeration(): number {
+  return verticalExaggeration;
+}
 
 // 日本の概略 bbox（ルートタイル・事前ロード範囲のクランプに使う。小笠原などは除外）。
 export const JAPAN_BBOX = { latMin: 20, latMax: 46, lonMin: 122, lonMax: 154 };
@@ -44,8 +52,8 @@ const ORIGIN_MX = lonToMercX(ORIGIN_LON);
 const ORIGIN_MY = latToMercY(ORIGIN_LAT);
 // メルカトルmは引き伸ばされている。基準緯度の cos を掛けて実距離に近づけ、/1000 で km。
 const WORLD_SCALE = Math.cos((ORIGIN_LAT * Math.PI) / 180) / 1000;
-// 標高(m) → ワールド単位(km相当)。VEX を掛けて強調。
-export const ELEV_SCALE = (VERTICAL_EXAGGERATION / 1000) * Math.cos((ORIGIN_LAT * Math.PI) / 180);
+// VEX=1 のときの標高スケール（水平と同じ＝実寸 1:1:1）。実際は VEX を掛ける。
+const ELEV_BASE = Math.cos((ORIGIN_LAT * Math.PI) / 180) / 1000;
 
 /** メルカトルX(m) → ワールドX（東+）。 */
 export function mercXToWorld(mx: number): number {
@@ -57,9 +65,9 @@ export function mercXToWorld(mx: number): number {
 export function mercYToWorld(my: number): number {
   return -(my - ORIGIN_MY) * WORLD_SCALE;
 }
-/** 標高(m) → ワールドY（上+、VEX反映）。 */
+/** 標高(m) → ワールドY（上+、現在の VEX を反映）。 */
 export function elevToWorldY(elevM: number): number {
-  return elevM * ELEV_SCALE;
+  return elevM * ELEV_BASE * verticalExaggeration;
 }
 
 /** ワールド水平座標(X=東, Z=南) → 経緯度（mercYToWorld の逆。事前ロード範囲の算出に使う）。 */
