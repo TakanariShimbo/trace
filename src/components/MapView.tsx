@@ -4,6 +4,8 @@ import { MapControls } from "three/examples/jsm/controls/MapControls.js";
 import { QuadtreeTerrain } from "../terrain/QuadtreeTerrain";
 import { CelestialLayer } from "../terrain/CelestialLayer";
 import { SkyDome } from "../terrain/SkyDome";
+import { PeakMarkers } from "../terrain/PeakMarkers";
+import { loadAllMountains } from "../lib/mountains";
 import { computeSky, computeTrack, type SkyState, type SkyBody } from "../lib/celestial";
 import {
   IconMountain,
@@ -115,6 +117,9 @@ export default function MapView() {
     setCamEyeHeight: (m: number) => void;
     setVerticalExaggeration: (v: number) => void;
     setSkySunDir: (x: number, y: number, z: number) => void;
+    setPeaksVisible: (on: boolean) => void;
+    setPeaksData: (data: Awaited<ReturnType<typeof loadAllMountains>>) => void;
+    clearPeakSelection: () => void;
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -137,6 +142,11 @@ export default function MapView() {
   // 空グラデーション表示。
   const [showSky, setShowSky] = useState(true);
   const showSkyRef = useRef(true);
+  // 山頂マーカー表示（既定オフ。初回有効化時に山岳データを遅延ロード）。
+  const [showPeaks, setShowPeaks] = useState(false);
+  const peaksLoadedRef = useRef(false);
+  // 選択中（色＋名前表示）の山の数。0より大きいとき画面に一括解除チップを出す。
+  const [peakSelCount, setPeakSelCount] = useState(0);
   // 視点フリーモード（解像度・太陽月・円盤を凍結して視点だけ動かす）。
   const [freeLook, setFreeLook] = useState(false);
   // 標高の誇張（×1=実寸 1:1:1）。モードごとに既定が異なる（地図1.7 / カメラ1.0）。
@@ -250,6 +260,51 @@ export default function MapView() {
     scene.add(skyDome.mesh);
     const sunDirWorld = new THREE.Vector3(0, 1, 0); // 直近の太陽方向（setCelestialSky で更新）
 
+    // 山頂マーカー（全山頂にグレーの点。タップで選択した山だけ色＋名前ラベルを出す）。
+    const peaks = new PeakMarkers();
+    scene.add(peaks.points);
+    // 選択中の山の名前ラベル（DOMオーバーレイ。毎フレーム画面座標へ投影して配置）。
+    const peakLabelLayer = document.createElement("div");
+    peakLabelLayer.className = "peak-label-layer";
+    mount.appendChild(peakLabelLayer);
+    const peakLabels = new Map<number, HTMLDivElement>();
+    // 選択集合に合わせてラベル DOM を増減する（選択トグル／一括解除の後に呼ぶ）。
+    const syncPeakLabels = () => {
+      for (const [i, el] of peakLabels) {
+        if (!peaks.selected.has(i)) {
+          el.remove();
+          peakLabels.delete(i);
+        }
+      }
+      peaks.forEachSelected((i, name) => {
+        if (!peakLabels.has(i)) {
+          const el = document.createElement("div");
+          el.className = "peak-label";
+          el.textContent = name;
+          peakLabelLayer.appendChild(el);
+          peakLabels.set(i, el);
+        }
+      });
+    };
+    const labelProj = new THREE.Vector3();
+    const positionPeakLabels = () => {
+      if (!peakLabels.size) return;
+      const w = mount.clientWidth;
+      const h = mount.clientHeight;
+      peaks.forEachSelected((i, _name, world) => {
+        const el = peakLabels.get(i);
+        if (!el) return;
+        labelProj.copy(world).project(camera);
+        if (labelProj.z <= 1) {
+          el.style.display = "block";
+          el.style.left = `${(labelProj.x * 0.5 + 0.5) * w}px`;
+          el.style.top = `${(-labelProj.y * 0.5 + 0.5) * h}px`;
+        } else {
+          el.style.display = "none"; // カメラ後方は隠す
+        }
+      });
+    };
+
     // 視点フリーモード: ON の間は地形LOD・円盤・太陽月を凍結し、カメラだけ動かせる。
     // OFF にしたら、ON にした瞬間の視点へ戻す。
     let freeLookActive = false;
@@ -361,12 +416,14 @@ export default function MapView() {
         cam.pitch = 0;
         cam.fov = CAM_FOV_DEFAULT;
         terrain.setClip(null, 0); // 円盤クリップ解除（カメラ視点は切り抜かない）
+        peaks.setCameraMode(true); // カメラ視点では選択(青)の山頂だけ残し、未選択(橙)は隠す
         cameraMode = true;
         controls.enabled = false;
         return { heading: cam.heading, pitch: cam.pitch, fov: cam.fov };
       },
       exitCamera: () => {
         cameraMode = false;
+        peaks.setCameraMode(false); // 地図に戻ったら未選択(橙)の山頂も再表示
         controls.enabled = true;
         if (mapPose) {
           camera.position.copy(mapPose.pos);
@@ -390,8 +447,18 @@ export default function MapView() {
       setVerticalExaggeration: (v) => {
         applyVEX(v);
         terrain.rebuild(); // 標高はメッシュ頂点に焼き込み済みなので作り直し
+        peaks.refreshY(); // 山頂マーカーの高さも新しい誇張率へ
       },
       setSkySunDir: (x, y, z) => sunDirWorld.set(x, y, z),
+      setPeaksVisible: (on) => {
+        peaks.setVisible(on);
+        peakLabelLayer.style.display = on ? "block" : "none"; // 非表示時はラベルも隠す（選択は保持）
+      },
+      setPeaksData: (data) => peaks.setData(data),
+      clearPeakSelection: () => {
+        peaks.clearSelection();
+        syncPeakLabels();
+      },
     };
 
     // --- カメラ視点の見回し操作（1本指=向き / 2本指ピンチ=画角 / ホイール=画角） --- //
@@ -446,6 +513,37 @@ export default function MapView() {
     window.addEventListener("pointerup", onCamUp);
     window.addEventListener("pointercancel", onCamUp);
     renderer.domElement.addEventListener("wheel", onCamWheel, { passive: false });
+
+    // --- 山頂タップ選択（地図・カメラ両モード共通）。ドラッグと区別するため移動量で判定 --- //
+    let tapId = -1;
+    let tapX = 0;
+    let tapY = 0;
+    let tapMoved = false;
+    const onTapDown = (e: PointerEvent) => {
+      tapId = e.pointerId;
+      tapX = e.clientX;
+      tapY = e.clientY;
+      tapMoved = false;
+    };
+    const onTapMove = (e: PointerEvent) => {
+      if (e.pointerId !== tapId) return;
+      if (Math.hypot(e.clientX - tapX, e.clientY - tapY) > 6) tapMoved = true; // パン/回転とみなす
+    };
+    const onTapUp = (e: PointerEvent) => {
+      if (e.pointerId !== tapId) return;
+      tapId = -1;
+      if (tapMoved || !peaks.points.visible) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const i = peaks.pick(e.clientX - rect.left, e.clientY - rect.top, camera, mount.clientWidth, mount.clientHeight);
+      if (i == null) return;
+      peaks.toggle(i);
+      syncPeakLabels();
+      setPeakSelCount(peaks.selectedCount);
+    };
+    renderer.domElement.addEventListener("pointerdown", onTapDown);
+    window.addEventListener("pointermove", onTapMove);
+    window.addEventListener("pointerup", onTapUp);
+    window.addEventListener("pointercancel", onTapUp);
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
     const UP = new THREE.Vector3(0, 1, 0);
@@ -541,6 +639,7 @@ export default function MapView() {
         skyDome.setSunDir(sunDirWorld);
         skyDome.place(camera.position);
         terrain.update(camera, mount.clientHeight, 30);
+        positionPeakLabels(); // 選択中の山名ラベルを画面へ追従
         renderer.render(scene, camera);
         raf = requestAnimationFrame(loop);
         return;
@@ -574,6 +673,7 @@ export default function MapView() {
         }
         terrain.update(camera, mount.clientHeight, camDist);
       }
+      positionPeakLabels(); // 選択中の山名ラベルを画面へ追従
 
       // 中心レティクルは「マップの中心」を、その地点の地形表面の高さに置いて画面投影。
       // （Y=0の海面ではなく地表に合わせる＝斜め視点でも山頂などにピタリ合う）
@@ -614,12 +714,18 @@ export default function MapView() {
       window.removeEventListener("pointerup", onCamUp);
       window.removeEventListener("pointercancel", onCamUp);
       renderer.domElement.removeEventListener("wheel", onCamWheel);
+      renderer.domElement.removeEventListener("pointerdown", onTapDown);
+      window.removeEventListener("pointermove", onTapMove);
+      window.removeEventListener("pointerup", onTapUp);
+      window.removeEventListener("pointercancel", onTapUp);
       ro.disconnect();
       apiRef.current = null;
       previewRing.geometry.dispose();
       (previewRing.material as THREE.Material).dispose();
       celestial.dispose();
       skyDome.dispose();
+      peaks.dispose();
+      peakLabelLayer.remove();
       controls.dispose();
       terrain.dispose();
       renderer.dispose();
@@ -851,6 +957,16 @@ export default function MapView() {
     </label>
   );
 
+  // 山頂マーカーの表示切替。初回 ON で山岳データを遅延ロードして流し込む。
+  const togglePeaks = (on: boolean) => {
+    setShowPeaks(on);
+    if (on && !peaksLoadedRef.current) {
+      peaksLoadedRef.current = true;
+      loadAllMountains().then((data) => apiRef.current?.setPeaksData(data));
+    }
+    apiRef.current?.setPeaksVisible(on);
+  };
+
   // ホーム: 現在地が判明していればそこへ、なければ日本全体ビューへ。
   const goHome = () => {
     if (homeLocRef.current) apiRef.current?.flyTo(homeLocRef.current);
@@ -921,6 +1037,22 @@ export default function MapView() {
         {mode === "map" ? <IconCamera size={16} /> : <IconMap size={16} />}
         <span>{mode === "map" ? "カメラ視点" : "地図に戻る"}</span>
       </button>
+
+      {/* 山頂選択の一括解除チップ（選択が1つ以上ある時だけ表示） */}
+      {showPeaks && peakSelCount > 0 && (
+        <button
+          className="peak-clear"
+          title="選択した山頂の色と名前表示をすべて解除"
+          onClick={() => {
+            apiRef.current?.clearPeakSelection();
+            setPeakSelCount(0);
+          }}
+        >
+          <IconMountain size={15} />
+          <span>山頂 {peakSelCount} 選択中</span>
+          <b>×すべて解除</b>
+        </button>
+      )}
 
       {/* カメラ視点モードのHUD（下） */}
       {mode === "camera" && (
@@ -1049,6 +1181,15 @@ export default function MapView() {
           {secHead("view", "表示")}
           {switchRow("操作リモコン（右下）", showRemote, setShowRemote)}
           {switchRow("中心マーカー", showCenter, setShowCenter)}
+          <label className="switch-row">
+            <span>山頂マーカー</span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={showPeaks}
+              onChange={(e) => togglePeaks(e.target.checked)}
+            />
+          </label>
           {switchRow("空のグラデーション", showSky, setShowSky)}
           <label className="slider-row">
             <span className="slider-label">
