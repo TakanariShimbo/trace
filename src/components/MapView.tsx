@@ -423,8 +423,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     };
 
     // AR微調整/書き出し中、写真と3Dの「写る範囲」を一致させる枠（CSS px, 左上原点）。
-    // 上下の余白は解放し、画面の全高×全幅に写真アスペクトで内接（contain）。
-    // 上のステップ表示・下のパネルは写真に重なる（できるだけ大きく表示する）。
+    // 画面の全高×全幅に写真アスペクトで内接（contain）し、横は中央、縦は基本中央。
+    // ただし下パネルと重なる場合は、上に余白がある分だけ上へ寄せて重なりを避ける
+    // （パネル上に収まらないほど大きい時だけ上端に寄せ＝上部に余白を残さず重なる）。
     const arStageRect = () => {
       const W = mount.clientWidth;
       const H = mount.clientHeight;
@@ -435,7 +436,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         h = H;
         w = h * aspect;
       }
-      return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+      const panelTop = H - ((arHudRef.current?.offsetHeight ?? 150) + 32); // 下パネルの上端(余白込み)
+      let y = (H - h) / 2; // 基本は全高で中央
+      if (y + h > panelTop) y = Math.max(0, panelTop - h); // 重なるなら上へ寄せ、収まらなければ上端
+      return { x: (W - w) / 2, y, w, h };
     };
     // AR微調整/書き出しで写真枠に合わせて描画するか。
     const isArStage = () =>
