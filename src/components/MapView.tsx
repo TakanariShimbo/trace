@@ -536,6 +536,34 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewConePlanes.frustumCulled = false;
     viewConePlanes.visible = false;
     scene.add(viewConePlanes);
+    // 画角の中心「面」（撮影地点から中心方向へ伸びる垂直の面）。中心線と合わせて中心を示す。
+    // 頂点: 0=apex下, 1=apex上, 2=遠端下, 3=遠端上。apex濃い→遠端透明のグラデーション。
+    const viewConeCenterPos = new Float32Array(4 * 3);
+    const viewConeCenterGeom = new THREE.BufferGeometry();
+    viewConeCenterGeom.setAttribute("position", new THREE.BufferAttribute(viewConeCenterPos, 3));
+    {
+      const cr = 0.37; // 塗りと同色
+      const cg = 0.63;
+      const cb = 0.9;
+      const a = 0.42;
+      const col = new Float32Array([cr, cg, cb, a, cr, cg, cb, a, cr, cg, cb, 0, cr, cg, cb, 0]);
+      viewConeCenterGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
+    }
+    viewConeCenterGeom.setIndex([0, 2, 3, 0, 3, 1]);
+    const viewConeCenter = new THREE.Mesh(
+      viewConeCenterGeom,
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }),
+    );
+    viewConeCenter.renderOrder = 998;
+    viewConeCenter.frustumCulled = false;
+    viewConeCenter.visible = false;
+    scene.add(viewConeCenter);
     // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
       const lowY = elevToWorldY(VC_BOT_M);
@@ -573,12 +601,19 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         viewConeLinePos[b + 4] = highY;
         viewConeLinePos[b + 5] = fz;
       }
+      // 中心面（中心方向 h0 へ R まで伸びる垂直の面）。
+      const cfx = ex + R * Math.sin(h0);
+      const cfz = ez - R * Math.cos(h0);
+      viewConeCenterPos.set([ex, lowY, ez, ex, highY, ez, cfx, lowY, cfz, cfx, highY, cfz]);
+      viewConeCenterGeom.attributes.position.needsUpdate = true;
       viewConeLineGeom.attributes.position.needsUpdate = true;
       viewConeGeom.attributes.position.needsUpdate = true;
       viewConeGeom.computeBoundingSphere();
       viewConeLineGeom.computeBoundingSphere();
+      viewConeCenterGeom.computeBoundingSphere();
       viewCone.visible = true;
       viewConePlanes.visible = true;
+      viewConeCenter.visible = true;
     };
 
     const getCenter = (): LonLat | null => {
@@ -768,6 +803,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       hideViewCone: () => {
         viewCone.visible = false;
         viewConePlanes.visible = false;
+        viewConeCenter.visible = false;
       },
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
@@ -1173,6 +1209,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       (viewCone.material as THREE.Material).dispose();
       viewConePlanes.geometry.dispose();
       (viewConePlanes.material as THREE.Material).dispose();
+      viewConeCenter.geometry.dispose();
+      (viewConeCenter.material as THREE.Material).dispose();
       celestial.dispose();
       skyDome.dispose();
       peaks.dispose();
