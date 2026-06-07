@@ -397,10 +397,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const arPinWorld = new THREE.Vector3(); // AR撮影地点ピンの投影用
     const sampleSurfaceY = (x: number, z: number): number => {
       // 観測点の上空から真下へレイし、表示中の地形メッシュ表面の高さを得る。
+      // 重要: クアッドツリーは非表示の粗いLODタイルも prune まで group に残す。
+      // three.js の raycast は visible を見ない（layers のみ）ため、何も対策しないと
+      // 非表示の粗い面（表示面より高いことがある）に当たり、点が表示面からズレて浮く。
+      // → 当たったうち「表示中(visible)」のタイル面だけを採用する。
       rayOrigin.set(x, 9000, z);
       camRay.set(rayOrigin, DOWN);
       const hits = camRay.intersectObjects(terrain.group.children, false);
-      return hits.length ? hits[0].point.y : 0;
+      for (let i = 0; i < hits.length; i++) {
+        if (hits[i].object.visible) return hits[i].point.y;
+      }
+      return 0;
     };
 
     // AR微調整/書き出し中、写真と3Dの「写る範囲」を一致させる枠（CSS px, 左上原点）。
