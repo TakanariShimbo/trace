@@ -161,7 +161,8 @@ body,
 .cam-hud {
   position: absolute;
   left: 50%;
-  bottom: max(14px, env(safe-area-inset-bottom, 14px));
+  /* 出典(左下)に被らないよう少し上げる */
+  bottom: calc(max(8px, env(safe-area-inset-bottom, 8px)) + 24px);
   transform: translateX(-50%);
   width: min(460px, calc(100vw - 24px));
   display: flex;
@@ -982,7 +983,8 @@ body,
 .ar-dock {
   position: absolute;
   left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  /* 出典(左下)に被らないよう少し上げる */
+  bottom: calc(max(8px, env(safe-area-inset-bottom, 8px)) + 24px);
   transform: translateX(-50%);
   width: min(460px, calc(100vw - 24px));
   display: flex;
@@ -1003,9 +1005,50 @@ body,
   flex-wrap: nowrap;
   justify-content: center;
   gap: 8px;
-  max-width: 100%;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(130, 150, 175, 0.18);
+  flex: 1;
+  min-width: 0;
+}
+/* パネルのつかみ手（進行表示＋畳むボタン）。ここをドラッグで移動。 */
+.ar-panel-grip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ar-panel-grip:active {
+  cursor: grabbing;
+}
+.cam-hud-grip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* 畳む/開く ボタン */
+.ar-panel-toggle {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  color: #cdd6e2;
+  background: rgba(40, 52, 68, 0.55);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ar-panel-toggle:hover {
+  background: rgba(54, 68, 86, 0.7);
+}
+/* 折りたたみ対象の本体（ドック） */
+.ar-dock-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 /* ドック内のアナウンス文 */
 .ar-hint {

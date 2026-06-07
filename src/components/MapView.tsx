@@ -22,6 +22,7 @@ import {
   IconCube,
   IconGrid,
   IconEye,
+  IconCaret,
 } from "./icons";
 import {
   worldToLonLat,
@@ -212,6 +213,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
   const arDragRef = useRef<{ i: number; kind: "dot" | "label" } | null>(null); // ドラッグ中の対象
+  // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
+  const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
+  const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
+  const arDockDragRef = useRef<{ px: number; py: number; ox: number; oy: number } | null>(null);
   // --- ライブAR（カメラでその場AR）専用 --- //
   const liveVideoRef = useRef<HTMLVideoElement | null>(null); // 背面カメラのライブ映像
   const liveStreamRef = useRef<MediaStream | null>(null); // 取得中のカメラストリーム（解放用）
@@ -1250,6 +1255,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   useEffect(() => {
     arStepRef.current = arStep;
   }, [arStep]);
+  // フェーズが変わったら下部パネルは開いて中央へ戻す（畳み/移動はそのフェーズ内だけ）。
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setArPanelOpen(true);
+    setArDockOffset({ x: 0, y: 0 });
+  }, [arStep]);
   // 地図の2D/3D切替を反映（カメラ視点中は地図に戻った時に効く）。
   useEffect(() => {
     map2DRef.current = map2D;
@@ -1833,6 +1844,23 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
   const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
 
+  // AR下部パネル: つかんで移動。フェーズが変わったら開いて中央に戻す。
+  const onDockGripDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return; // ボタン操作は移動にしない
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    arDockDragRef.current = { px: e.clientX, py: e.clientY, ox: arDockOffset.x, oy: arDockOffset.y };
+  };
+  const onDockGripMove = (e: React.PointerEvent) => {
+    const d = arDockDragRef.current;
+    if (!d) return;
+    const x = Math.max(-window.innerWidth / 2 + 60, Math.min(window.innerWidth / 2 - 60, d.ox + (e.clientX - d.px)));
+    const y = Math.max(-(window.innerHeight - 180), Math.min(0, d.oy + (e.clientY - d.py)));
+    setArDockOffset({ x, y });
+  };
+  const onDockGripUp = () => {
+    arDockDragRef.current = null;
+  };
+
   // AR/ライブの進行表示（1〜5）。ドック・カメラHUD・出力編集の各下部パネルで使い回す。
   const arStepsBar =
     arLike && arStep !== "upload" ? (
@@ -1930,11 +1958,32 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </div>
       )}
 
-      {/* AR下部ドック（地図フェーズ）: 進行表示＋アナウンス＋操作を1つのパネルに集約。 */}
+      {/* AR下部ドック（地図フェーズ）: 進行表示＋アナウンス＋操作を1つのパネルに集約。
+          つかんで移動・畳んで地図を見やすくできる。 */}
       {arLike && (arStep === "locate" || arStep === "params" || arStep === "select") && (
-        <div className="ar-dock">
-          {arStepsBar}
-
+        <div
+          className="ar-dock"
+          style={{ transform: `translate(calc(-50% + ${arDockOffset.x}px), ${arDockOffset.y}px)` }}
+        >
+          <div
+            className="ar-panel-grip"
+            onPointerDown={onDockGripDown}
+            onPointerMove={onDockGripMove}
+            onPointerUp={onDockGripUp}
+            onPointerCancel={onDockGripUp}
+          >
+            {arStepsBar}
+            <button
+              className="ar-panel-toggle"
+              title={arPanelOpen ? "畳む" : "開く"}
+              aria-label={arPanelOpen ? "畳む" : "開く"}
+              onClick={() => setArPanelOpen((o) => !o)}
+            >
+              <IconCaret dir={arPanelOpen ? "down" : "up"} size={16} />
+            </button>
+          </div>
+          {arPanelOpen && (
+            <div className="ar-dock-body">
           {arStep === "locate" && (
             <>
               <div className="ar-hint">
@@ -2055,6 +2104,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </button>
               </div>
             </>
+          )}
+            </div>
           )}
         </div>
       )}
@@ -2240,7 +2291,19 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {/* カメラ視点モードのHUD（下）。AR書き出し中は隠す（合成パネルを前面に）。 */}
       {mode === "camera" && !(appMode === "ar" && arStep === "export") && (
         <div className="cam-hud" ref={arHudRef}>
-          {arStepsBar}
+          <div className="cam-hud-grip">
+            {arStepsBar}
+            <button
+              className="ar-panel-toggle"
+              title={arPanelOpen ? "畳む（縦画像を大きく）" : "開く"}
+              aria-label={arPanelOpen ? "畳む" : "開く"}
+              onClick={() => setArPanelOpen((o) => !o)}
+            >
+              <IconCaret dir={arPanelOpen ? "down" : "up"} size={16} />
+            </button>
+          </div>
+          {arPanelOpen && (
+          <>
           <div className="cam-readout">
             <span>方位 {compass(camHeading)} {Math.round(camHeading)}°</span>
             <span>仰角 {Math.round(camPitch)}°</span>
@@ -2368,6 +2431,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </button>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       )}
