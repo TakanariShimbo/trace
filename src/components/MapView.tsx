@@ -2180,18 +2180,21 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               />
             </label>
           )}
-          {/* 水平の傾き（ロール）補正。向きは変えずビュー軸まわりに回すだけ（シミュ・AR共通） */}
-          <label className="cam-eye">
-            <span>水平の傾き {camRoll}°（左 ←→ 右）</span>
-            <input
-              type="range"
-              min={-45}
-              max={45}
-              step={0.5}
-              value={camRoll}
-              onChange={(e) => changeCamRoll(Number(e.target.value))}
-            />
-          </label>
+          {/* 水平の傾き（ロール）補正。向きは変えずビュー軸まわりに回すだけ。
+              ライブ（カメラAR）は端末を傾けて合わせられるので不要 → 非表示。写真 AR とシミュでは出す。 */}
+          {appMode !== "live" && (
+            <label className="cam-eye">
+              <span>水平の傾き {camRoll}°（左 ←→ 右）</span>
+              <input
+                type="range"
+                min={-45}
+                max={45}
+                step={0.5}
+                value={camRoll}
+                onChange={(e) => changeCamRoll(Number(e.target.value))}
+              />
+            </label>
+          )}
           {/* 写真オーバーレイ操作（ARモードのみ）: 未読込なら取り込み、読込済みなら不透明度＋解除 */}
           {appMode === "ar" && (
             <div className="cam-photo">
@@ -2263,7 +2266,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "live" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで傾きを合わせて確認（画角は②で設定）。
+                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認（傾きは端末を傾けて／画角は②で設定）。
               </span>
               <div className="ar-dock-actions">
                 <button
