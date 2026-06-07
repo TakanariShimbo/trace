@@ -507,50 +507,30 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewCone.frustumCulled = false;
     viewCone.visible = false;
     scene.add(viewCone);
-    // 画角の「中心」と「両端」を、撮影地点から各方向へ伸びる薄い板（スラブ＝厚みのある面）で描く。
-    // 厚みゼロの面だと真上(エッジオン)で消えるため、わずかな水平の厚みを持たせて真上でも帯として見せる。
-    // 各スラブ＝箱（8頂点）。近4頂点(0..3)=apex側 / 遠4頂点(4..7)=遠端側。
-    //   局所頂点: 0=-perp下,1=-perp上,2=+perp下,3=+perp上（近）/ 4..7 同順（遠）。
-    const VC_PLANES = 3; // 0=中心, 1=左端, 2=右端
-    const viewConePlanePos = new Float32Array(VC_PLANES * 8 * 3);
-    const viewConePlaneGeom = new THREE.BufferGeometry();
-    viewConePlaneGeom.setAttribute("position", new THREE.BufferAttribute(viewConePlanePos, 3));
+    // 画角の「中心」と「両端」を、ゾーン上面(highY)に沿う3本の線で描く（中心 h0 / 左端 / 右端）。
+    // 下面には描かない。線色は塗り(面)と同色にして横から見ても浮いた線に見えないようにし、
+    // apex濃い→遠端透明のグラデーションで遠端の硬い線も出さない。
+    // 線分: [apex, 遠端] を3本 = 6頂点（LineSegments は連続2点ごとに1線分）。
+    const viewConeLinePos = new Float32Array(3 * 2 * 3);
+    const viewConeLineGeom = new THREE.BufferGeometry();
+    viewConeLineGeom.setAttribute("position", new THREE.BufferAttribute(viewConeLinePos, 3));
     {
-      const cr = 0.62;
-      const cg = 0.8;
-      const cb = 1.0;
-      const col = new Float32Array(VC_PLANES * 8 * 4);
-      const pidx: number[] = [];
-      for (let k = 0; k < VC_PLANES; k++) {
-        const apexA = k === 0 ? 0.5 : 0.42; // 中心はやや濃く、両端は少し控えめ
-        const base = k * 8;
-        for (let j = 0; j < 8; j++) {
-          const o = (base + j) * 4;
-          col[o] = cr;
-          col[o + 1] = cg;
-          col[o + 2] = cb;
-          col[o + 3] = j < 4 ? apexA : 0; // 近=濃い → 遠=透明（グラデーション）
-        }
-        const f = (a: number, b: number, c: number) => pidx.push(base + a, base + b, base + c);
-        f(0, 1, 3); f(0, 3, 2); // 近キャップ
-        f(4, 6, 7); f(4, 7, 5); // 遠キャップ
-        f(0, 4, 5); f(0, 5, 1); // -perp側面
-        f(2, 3, 7); f(2, 7, 6); // +perp側面
-        f(1, 5, 7); f(1, 7, 3); // 天面（真上から見える）
-        f(0, 2, 6); f(0, 6, 4); // 底面
+      const cr = 0.37; // 塗り(viewCone)と同色
+      const cg = 0.63;
+      const cb = 0.9;
+      const apexA = 0.6;
+      const col = new Float32Array(3 * 2 * 4);
+      for (let k = 0; k < 3; k++) {
+        const a0 = (k * 2) * 4; // apex頂点
+        const a1 = (k * 2 + 1) * 4; // 遠端頂点
+        col[a0] = cr; col[a0 + 1] = cg; col[a0 + 2] = cb; col[a0 + 3] = apexA;
+        col[a1] = cr; col[a1 + 1] = cg; col[a1 + 2] = cb; col[a1 + 3] = 0;
       }
-      viewConePlaneGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
-      viewConePlaneGeom.setIndex(pidx);
+      viewConeLineGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
     }
-    const viewConePlanes = new THREE.Mesh(
-      viewConePlaneGeom,
-      new THREE.MeshBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      }),
+    const viewConePlanes = new THREE.LineSegments(
+      viewConeLineGeom,
+      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false }),
     );
     viewConePlanes.renderOrder = 999;
     viewConePlanes.frustumCulled = false;
@@ -579,37 +559,24 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         setV(vcBotArc(i), x, lowY, z);
         setV(vcTopArc(i), x, highY, z);
       }
-      // 中心＋両端のスラブ（中心 h0 / 左端 h0-half / 右端 h0+half）を、各方向へ R まで伸ばす。
-      // 厚み hw はカメラ距離に比例＝ズームしても帯の見かけ太さがほぼ一定（真上でも見える）。
-      const camDist = camera.position.distanceTo(controls.target);
-      const hw = THREE.MathUtils.clamp(camDist * 0.0015, 0.03, 0.8); // 板の厚み(半分)。細い帯に
-      const planeAngles = [h0, h0 - half, h0 + half];
-      const setPV = (vi: number, x: number, y: number, z: number) => {
-        const o = vi * 3;
-        viewConePlanePos[o] = x;
-        viewConePlanePos[o + 1] = y;
-        viewConePlanePos[o + 2] = z;
-      };
-      for (let k = 0; k < planeAngles.length; k++) {
-        const th = planeAngles[k];
-        const fx = ex + R * Math.sin(th); // 遠端（中心方向 R）
+      // 中心＋両端の3本の線を、ゾーン上面(highY)に沿って apex→遠端 で引く（下面には描かない）。
+      const lineAngles = [h0, h0 - half, h0 + half];
+      for (let k = 0; k < lineAngles.length; k++) {
+        const th = lineAngles[k];
+        const fx = ex + R * Math.sin(th);
         const fz = ez - R * Math.cos(th);
-        const px = Math.cos(th) * hw; // 進行方向に水平直交なオフセット
-        const pz = Math.sin(th) * hw;
-        const b = k * 8;
-        setPV(b + 0, ex - px, lowY, ez - pz); // 近 -perp 下
-        setPV(b + 1, ex - px, highY, ez - pz); // 近 -perp 上
-        setPV(b + 2, ex + px, lowY, ez + pz); // 近 +perp 下
-        setPV(b + 3, ex + px, highY, ez + pz); // 近 +perp 上
-        setPV(b + 4, fx - px, lowY, fz - pz); // 遠 -perp 下
-        setPV(b + 5, fx - px, highY, fz - pz); // 遠 -perp 上
-        setPV(b + 6, fx + px, lowY, fz + pz); // 遠 +perp 下
-        setPV(b + 7, fx + px, highY, fz + pz); // 遠 +perp 上
+        const b = k * 6; // 2頂点 × 3成分
+        viewConeLinePos[b] = ex; // apex（上面）
+        viewConeLinePos[b + 1] = highY;
+        viewConeLinePos[b + 2] = ez;
+        viewConeLinePos[b + 3] = fx; // 遠端（上面）
+        viewConeLinePos[b + 4] = highY;
+        viewConeLinePos[b + 5] = fz;
       }
-      viewConePlaneGeom.attributes.position.needsUpdate = true;
+      viewConeLineGeom.attributes.position.needsUpdate = true;
       viewConeGeom.attributes.position.needsUpdate = true;
       viewConeGeom.computeBoundingSphere();
-      viewConePlaneGeom.computeBoundingSphere();
+      viewConeLineGeom.computeBoundingSphere();
       viewCone.visible = true;
       viewConePlanes.visible = true;
     };
