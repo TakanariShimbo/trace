@@ -507,40 +507,37 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewCone.frustumCulled = false;
     viewCone.visible = false;
     scene.add(viewCone);
-    // 縁（上下の弧＋角の縦エッジ）。位置はメッシュと共有し、線分で描く。
-    const viewConeEdgeGeom = new THREE.BufferGeometry();
-    viewConeEdgeGeom.setAttribute("position", viewConeGeom.getAttribute("position"));
-    // 放射線（側辺）だけ描く。遠端の弧（コ）は出さない＝グラデーションの透過を邪魔しない。
-    const edgeIdx: number[] = [];
-    edgeIdx.push(vcTopApex, vcTopArc(0), vcTopApex, vcTopArc(VC_N)); // 天の側辺
-    edgeIdx.push(vcBotApex, vcBotArc(0), vcBotApex, vcBotArc(VC_N)); // 底の側辺
-    viewConeEdgeGeom.setIndex(edgeIdx);
-    const viewConeEdge = new THREE.LineSegments(
-      viewConeEdgeGeom,
-      new THREE.LineBasicMaterial({ color: 0x9fd0ff, transparent: true, opacity: 0.8, depthTest: false }),
-    );
-    viewConeEdge.renderOrder = 999;
-    viewConeEdge.frustumCulled = false;
-    viewConeEdge.visible = false;
-    scene.add(viewConeEdge);
-    // 画角の中心面（撮影地点から中心方向へ伸びる垂直の面）。真上から見ると中心線に見える。
-    // 頂点: 0=apex下, 1=apex上, 2=遠端下, 3=遠端上
-    const viewConeCenterPos = new Float32Array(4 * 3);
-    const viewConeCenterGeom = new THREE.BufferGeometry();
-    viewConeCenterGeom.setAttribute("position", new THREE.BufferAttribute(viewConeCenterPos, 3));
+    // 画角の「中心面」と「両端の面」（撮影地点から各方向へ伸びる垂直の面）を描く。
+    // 真上から見ると線に見えるが実体は面なので、別途の線（LineSegments）は使わない。
+    // 各面: 頂点 4つ（apex下/apex上/遠端下/遠端上）。面 k のオフセット = k*4。
+    const VC_PLANES = 3; // 0=中心, 1=左端, 2=右端
+    const viewConePlanePos = new Float32Array(VC_PLANES * 4 * 3);
+    const viewConePlaneGeom = new THREE.BufferGeometry();
+    viewConePlaneGeom.setAttribute("position", new THREE.BufferAttribute(viewConePlanePos, 3));
     {
       const cr = 0.62;
       const cg = 0.8;
       const cb = 1.0;
-      const col = new Float32Array([
-        cr, cg, cb, 0.5, cr, cg, cb, 0.5, // apex（中心は濃く）
-        cr, cg, cb, 0, cr, cg, cb, 0, // 遠端は透明
-      ]);
-      viewConeCenterGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
+      const col = new Float32Array(VC_PLANES * 4 * 4);
+      const pidx: number[] = [];
+      for (let k = 0; k < VC_PLANES; k++) {
+        const apexA = k === 0 ? 0.5 : 0.42; // 中心はやや濃く、両端は少し控えめ
+        const alphas = [apexA, apexA, 0, 0]; // apex下/上=濃い → 遠端下/上=透明（グラデーション）
+        const base = k * 4;
+        for (let j = 0; j < 4; j++) {
+          const o = (base + j) * 4;
+          col[o] = cr;
+          col[o + 1] = cg;
+          col[o + 2] = cb;
+          col[o + 3] = alphas[j];
+        }
+        pidx.push(base, base + 2, base + 3, base, base + 3, base + 1);
+      }
+      viewConePlaneGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
+      viewConePlaneGeom.setIndex(pidx);
     }
-    viewConeCenterGeom.setIndex([0, 2, 3, 0, 3, 1]);
-    const viewConeCenter = new THREE.Mesh(
-      viewConeCenterGeom,
+    const viewConePlanes = new THREE.Mesh(
+      viewConePlaneGeom,
       new THREE.MeshBasicMaterial({
         vertexColors: true,
         transparent: true,
@@ -549,10 +546,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         side: THREE.DoubleSide,
       }),
     );
-    viewConeCenter.renderOrder = 998;
-    viewConeCenter.frustumCulled = false;
-    viewConeCenter.visible = false;
-    scene.add(viewConeCenter);
+    viewConePlanes.renderOrder = 999;
+    viewConePlanes.frustumCulled = false;
+    viewConePlanes.visible = false;
+    scene.add(viewConePlanes);
     // 視野ゾーンを撮影地点・方向・画角に合わせて作り直す。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
       const lowY = elevToWorldY(VC_BOT_M);
@@ -576,17 +573,31 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         setV(vcBotArc(i), x, lowY, z);
         setV(vcTopArc(i), x, highY, z);
       }
-      // 中心面（中心方向 h0 へ R まで伸びる垂直の面）。
-      const cfx = ex + R * Math.sin(h0);
-      const cfz = ez - R * Math.cos(h0);
-      viewConeCenterPos.set([ex, lowY, ez, ex, highY, ez, cfx, lowY, cfz, cfx, highY, cfz]);
-      viewConeCenterGeom.attributes.position.needsUpdate = true;
+      // 中心面＋両端面（中心 h0 / 左端 h0-half / 右端 h0+half）を、各方向へ R まで伸ばす。
+      const planeAngles = [h0, h0 - half, h0 + half];
+      for (let k = 0; k < planeAngles.length; k++) {
+        const fx = ex + R * Math.sin(planeAngles[k]);
+        const fz = ez - R * Math.cos(planeAngles[k]);
+        const b = k * 12; // 4頂点 × 3成分
+        viewConePlanePos[b] = ex; // apex下
+        viewConePlanePos[b + 1] = lowY;
+        viewConePlanePos[b + 2] = ez;
+        viewConePlanePos[b + 3] = ex; // apex上
+        viewConePlanePos[b + 4] = highY;
+        viewConePlanePos[b + 5] = ez;
+        viewConePlanePos[b + 6] = fx; // 遠端下
+        viewConePlanePos[b + 7] = lowY;
+        viewConePlanePos[b + 8] = fz;
+        viewConePlanePos[b + 9] = fx; // 遠端上
+        viewConePlanePos[b + 10] = highY;
+        viewConePlanePos[b + 11] = fz;
+      }
+      viewConePlaneGeom.attributes.position.needsUpdate = true;
       viewConeGeom.attributes.position.needsUpdate = true;
       viewConeGeom.computeBoundingSphere();
-      viewConeCenterGeom.computeBoundingSphere();
+      viewConePlaneGeom.computeBoundingSphere();
       viewCone.visible = true;
-      viewConeEdge.visible = true;
-      viewConeCenter.visible = true;
+      viewConePlanes.visible = true;
     };
 
     const getCenter = (): LonLat | null => {
@@ -775,8 +786,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       },
       hideViewCone: () => {
         viewCone.visible = false;
-        viewConeEdge.visible = false;
-        viewConeCenter.visible = false;
+        viewConePlanes.visible = false;
       },
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
@@ -1180,10 +1190,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       (previewRing.material as THREE.Material).dispose();
       viewCone.geometry.dispose();
       (viewCone.material as THREE.Material).dispose();
-      viewConeEdge.geometry.dispose();
-      (viewConeEdge.material as THREE.Material).dispose();
-      viewConeCenter.geometry.dispose();
-      (viewConeCenter.material as THREE.Material).dispose();
+      viewConePlanes.geometry.dispose();
+      (viewConePlanes.material as THREE.Material).dispose();
       celestial.dispose();
       skyDome.dispose();
       peaks.dispose();
