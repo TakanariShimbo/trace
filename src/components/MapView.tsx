@@ -507,31 +507,37 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     viewCone.frustumCulled = false;
     viewCone.visible = false;
     scene.add(viewCone);
-    // 画角の「中心面」と「両端の面」（撮影地点から各方向へ伸びる垂直の面）を描く。
-    // 真上から見ると線に見えるが実体は面なので、別途の線（LineSegments）は使わない。
-    // 各面: 頂点 4つ（apex下/apex上/遠端下/遠端上）。面 k のオフセット = k*4。
+    // 画角の「中心」と「両端」を、撮影地点から各方向へ伸びる薄い板（スラブ＝厚みのある面）で描く。
+    // 厚みゼロの面だと真上(エッジオン)で消えるため、わずかな水平の厚みを持たせて真上でも帯として見せる。
+    // 各スラブ＝箱（8頂点）。近4頂点(0..3)=apex側 / 遠4頂点(4..7)=遠端側。
+    //   局所頂点: 0=-perp下,1=-perp上,2=+perp下,3=+perp上（近）/ 4..7 同順（遠）。
     const VC_PLANES = 3; // 0=中心, 1=左端, 2=右端
-    const viewConePlanePos = new Float32Array(VC_PLANES * 4 * 3);
+    const viewConePlanePos = new Float32Array(VC_PLANES * 8 * 3);
     const viewConePlaneGeom = new THREE.BufferGeometry();
     viewConePlaneGeom.setAttribute("position", new THREE.BufferAttribute(viewConePlanePos, 3));
     {
       const cr = 0.62;
       const cg = 0.8;
       const cb = 1.0;
-      const col = new Float32Array(VC_PLANES * 4 * 4);
+      const col = new Float32Array(VC_PLANES * 8 * 4);
       const pidx: number[] = [];
       for (let k = 0; k < VC_PLANES; k++) {
         const apexA = k === 0 ? 0.5 : 0.42; // 中心はやや濃く、両端は少し控えめ
-        const alphas = [apexA, apexA, 0, 0]; // apex下/上=濃い → 遠端下/上=透明（グラデーション）
-        const base = k * 4;
-        for (let j = 0; j < 4; j++) {
+        const base = k * 8;
+        for (let j = 0; j < 8; j++) {
           const o = (base + j) * 4;
           col[o] = cr;
           col[o + 1] = cg;
           col[o + 2] = cb;
-          col[o + 3] = alphas[j];
+          col[o + 3] = j < 4 ? apexA : 0; // 近=濃い → 遠=透明（グラデーション）
         }
-        pidx.push(base, base + 2, base + 3, base, base + 3, base + 1);
+        const f = (a: number, b: number, c: number) => pidx.push(base + a, base + b, base + c);
+        f(0, 1, 3); f(0, 3, 2); // 近キャップ
+        f(4, 6, 7); f(4, 7, 5); // 遠キャップ
+        f(0, 4, 5); f(0, 5, 1); // -perp側面
+        f(2, 3, 7); f(2, 7, 6); // +perp側面
+        f(1, 5, 7); f(1, 7, 3); // 天面（真上から見える）
+        f(0, 2, 6); f(0, 6, 4); // 底面
       }
       viewConePlaneGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
       viewConePlaneGeom.setIndex(pidx);
@@ -573,24 +579,32 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         setV(vcBotArc(i), x, lowY, z);
         setV(vcTopArc(i), x, highY, z);
       }
-      // 中心面＋両端面（中心 h0 / 左端 h0-half / 右端 h0+half）を、各方向へ R まで伸ばす。
+      // 中心＋両端のスラブ（中心 h0 / 左端 h0-half / 右端 h0+half）を、各方向へ R まで伸ばす。
+      // 厚み hw はカメラ距離に比例＝ズームしても帯の見かけ太さがほぼ一定（真上でも見える）。
+      const camDist = camera.position.distanceTo(controls.target);
+      const hw = THREE.MathUtils.clamp(camDist * 0.0015, 0.03, 0.8); // 板の厚み(半分)。細い帯に
       const planeAngles = [h0, h0 - half, h0 + half];
+      const setPV = (vi: number, x: number, y: number, z: number) => {
+        const o = vi * 3;
+        viewConePlanePos[o] = x;
+        viewConePlanePos[o + 1] = y;
+        viewConePlanePos[o + 2] = z;
+      };
       for (let k = 0; k < planeAngles.length; k++) {
-        const fx = ex + R * Math.sin(planeAngles[k]);
-        const fz = ez - R * Math.cos(planeAngles[k]);
-        const b = k * 12; // 4頂点 × 3成分
-        viewConePlanePos[b] = ex; // apex下
-        viewConePlanePos[b + 1] = lowY;
-        viewConePlanePos[b + 2] = ez;
-        viewConePlanePos[b + 3] = ex; // apex上
-        viewConePlanePos[b + 4] = highY;
-        viewConePlanePos[b + 5] = ez;
-        viewConePlanePos[b + 6] = fx; // 遠端下
-        viewConePlanePos[b + 7] = lowY;
-        viewConePlanePos[b + 8] = fz;
-        viewConePlanePos[b + 9] = fx; // 遠端上
-        viewConePlanePos[b + 10] = highY;
-        viewConePlanePos[b + 11] = fz;
+        const th = planeAngles[k];
+        const fx = ex + R * Math.sin(th); // 遠端（中心方向 R）
+        const fz = ez - R * Math.cos(th);
+        const px = Math.cos(th) * hw; // 進行方向に水平直交なオフセット
+        const pz = Math.sin(th) * hw;
+        const b = k * 8;
+        setPV(b + 0, ex - px, lowY, ez - pz); // 近 -perp 下
+        setPV(b + 1, ex - px, highY, ez - pz); // 近 -perp 上
+        setPV(b + 2, ex + px, lowY, ez + pz); // 近 +perp 下
+        setPV(b + 3, ex + px, highY, ez + pz); // 近 +perp 上
+        setPV(b + 4, fx - px, lowY, fz - pz); // 遠 -perp 下
+        setPV(b + 5, fx - px, highY, fz - pz); // 遠 -perp 上
+        setPV(b + 6, fx + px, lowY, fz + pz); // 遠 +perp 下
+        setPV(b + 7, fx + px, highY, fz + pz); // 遠 +perp 上
       }
       viewConePlaneGeom.attributes.position.needsUpdate = true;
       viewConeGeom.attributes.position.needsUpdate = true;
