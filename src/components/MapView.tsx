@@ -825,6 +825,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         }
         return;
       }
+      // AR向き決めフェーズ: タップした方向に撮影方向を向ける。
+      if (arStepRef.current === "params") {
+        aimAtScreen(e.clientX, e.clientY);
+        return;
+      }
       if (!peaks.points.visible) return;
       const i = peaks.pick(e.clientX - rect.left, e.clientY - rect.top, camera, mount.clientWidth, mount.clientHeight);
       if (i == null) return;
@@ -836,15 +841,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     window.addEventListener("pointerup", onTapUp);
     window.addEventListener("pointercancel", onTapUp);
 
-    // --- AR向き決めフェーズ: 地図をドラッグして撮影方向を指す（撮影地点→カーソルの方位） --- //
-    let aiming = false;
-    const aimFromEvent = (e: PointerEvent) => {
+    // --- AR向き決めフェーズ: 地図を「タップ」した方向に撮影方向を向ける（撮影地点→タップ点の方位）。
+    // ドラッグはパン/回転に使うため、方向指定はタップ（移動なし）で行う。
+    const aimAtScreen = (clientX: number, clientY: number) => {
       const eye = arPinXZRef.current;
       if (!eye) return;
       const rect = renderer.domElement.getBoundingClientRect();
       tapNDC.set(
-        ((e.clientX - rect.left) / mount.clientWidth) * 2 - 1,
-        -((e.clientY - rect.top) / mount.clientHeight) * 2 + 1,
+        ((clientX - rect.left) / mount.clientWidth) * 2 - 1,
+        -((clientY - rect.top) / mount.clientHeight) * 2 + 1,
       );
       camRay.setFromCamera(tapNDC, camera);
       const hits = camRay.intersectObjects(terrain.group.children, false);
@@ -861,19 +866,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       if (dx * dx + dz * dz < 1e-4) return;
       setArHeadingDeg((((Math.atan2(dx, -dz) * 180) / Math.PI) + 360) % 360); // 0=北
     };
-    const onAimDown = (e: PointerEvent) => {
-      if (arStepRef.current !== "params") return;
-      aiming = true;
-      aimFromEvent(e);
-    };
-    const onAimMove = (e: PointerEvent) => {
-      if (aiming && arStepRef.current === "params") aimFromEvent(e);
-    };
-    const onAimUp = () => (aiming = false);
-    renderer.domElement.addEventListener("pointerdown", onAimDown);
-    window.addEventListener("pointermove", onAimMove);
-    window.addEventListener("pointerup", onAimUp);
-    window.addEventListener("pointercancel", onAimUp);
 
     // --- 画面ボタンによるカメラ操作（毎フレーム nav を反映） --- //
     const UP = new THREE.Vector3(0, 1, 0);
@@ -1107,10 +1099,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       window.removeEventListener("pointermove", onTapMove);
       window.removeEventListener("pointerup", onTapUp);
       window.removeEventListener("pointercancel", onTapUp);
-      renderer.domElement.removeEventListener("pointerdown", onAimDown);
-      window.removeEventListener("pointermove", onAimMove);
-      window.removeEventListener("pointerup", onAimUp);
-      window.removeEventListener("pointercancel", onAimUp);
       ro.disconnect();
       apiRef.current = null;
       previewRing.geometry.dispose();
@@ -1399,7 +1387,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const confirmArLocate = () => {
     if (!arLoc) return;
     apiRef.current?.frameAimView(arLoc.lon, arLoc.lat); // 撮影地点中心の北上俯瞰へ
-    apiRef.current?.setControlMode("aim"); // ドラッグ＝方向。回転・パンは無効
+    apiRef.current?.setControlMode("map"); // パン/回転/ズーム可。方向はタップで指定
     setArStep("params");
   };
   // 向き・画角フェーズの「次へ」: 決めた向き・画角で山選択(③)へ。
@@ -1417,7 +1405,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const backToParams = () => {
     if (!arLoc) return;
     apiRef.current?.frameAimView(arLoc.lon, arLoc.lat);
-    apiRef.current?.setControlMode("aim");
+    apiRef.current?.setControlMode("map");
     setArStep("params");
   };
   // 最初からやり直す（写真を外して写真選択フェーズへ）。
@@ -1433,11 +1421,18 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArLabels([]);
     setArStep("upload");
   };
+  // 撮影地点に戻る（自由に見て回った後、フェーズ1で決めた地点へ視点を戻す）。
+  const recenterAr = () => {
+    if (!arLoc) return;
+    if (arStep === "params") apiRef.current?.frameAimView(arLoc.lon, arLoc.lat);
+    else if (arStep === "select") apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0);
+    else apiRef.current?.flyTo({ lat: arLoc.lat, lon: arLoc.lon }); // locate
+  };
   // 向き・画角(②)→ 山選択(③)。撮影地点中心の俯瞰で、写る方向の山を奥行きつきで選ぶ。
   const goSelectFromParams = () => {
     if (!arLoc) return;
     apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0);
-    apiRef.current?.setControlMode("orbit"); // 場所は固定。回転・ズームのみ
+    apiRef.current?.setControlMode("map"); // パン/回転/ズーム可（シミュレーションと同じ操作）
     setArStep("select");
   };
   // 山選択(③)→ 微調整(④)。一人称へ。選んだ山名が写真に重なるので、見ながら合わせ込める。
@@ -1451,7 +1446,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setArFovDeg(camFov);
     exitCameraMode(); // 一人称→地図
     apiRef.current?.frameSelectView(arLoc.lon, arLoc.lat, camHeading);
-    apiRef.current?.setControlMode("orbit");
+    apiRef.current?.setControlMode("map");
     setArStep("select");
   };
   // 仕上げ(⑤)で編集した位置（arLabels）を写真に焼き込み、合成JPEGのデータURLを返す。
@@ -1743,7 +1738,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <div className="ar-locate-hint">
             <IconMountain size={15} />
             <span>
-              写真に写る山をタップして選びます。ドラッグで回転、ホイール／ピンチでズーム（撮影地点は固定）
+              写真に写る山をタップして選びます。地図は自由に移動・拡大できます（右下「撮影地点に戻る」で復帰）
             </span>
           </div>
           <div className="ar-bottom-bar">
@@ -1765,7 +1760,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         <>
           <div className="ar-locate-hint">
             <IconPin size={15} />
-            <span>地図をドラッグして撮影方向を指します。スライダーで画角（写る範囲）を調整。</span>
+            <span>地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。</span>
           </div>
           <div className="ar-aim-bar">
             <div className="ar-readout">
@@ -2375,6 +2370,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               onClick={toggleFreeLook}
             >
               {freeLook ? "自由視点：ON" : "自由視点"}
+            </button>
+          )}
+          {/* AR: 自由に見て回った後、撮影地点へ視点を戻す（自由視点の代わり）。 */}
+          {appMode === "ar" && arLoc && (
+            <button
+              className="freelook-toggle"
+              title="フェーズ1で決めた撮影地点へ視点を戻す"
+              onClick={recenterAr}
+            >
+              <IconPin size={14} />
+              <span>撮影地点に戻る</span>
             </button>
           )}
         </div>

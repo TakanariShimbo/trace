@@ -296,6 +296,9 @@ body,
 
 /* 自由視点切替（右下クラスタ内・リモコンの下） */
 .freelook-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 38px;
   padding: 0 14px;
   font-size: 13px;
