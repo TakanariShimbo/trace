@@ -120,16 +120,22 @@ body,
 }
 
 /* --- 地図⇄カメラ視点トグル（右上） --- */
-.mode-toggle {
+/* 上部アイコンバー（左上の横並び）。メニュー・現在地・カメラ・2D3D・自由視点。 */
+.topbar {
   position: absolute;
   top: max(8px, env(safe-area-inset-top, 8px));
-  right: max(8px, env(safe-area-inset-right, 8px));
+  left: max(8px, env(safe-area-inset-left, 8px));
+  display: flex;
+  gap: 8px;
+  z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)でも常に押せるように */
+}
+.topbar-btn {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  width: 42px;
   height: 42px;
-  padding: 0 14px;
-  font-size: 13px;
+  font-size: 20px; /* ☰ 用 */
   color: #e6edf5;
   background: rgba(18, 24, 33, 0.78);
   border: 1px solid rgba(130, 150, 175, 0.28);
@@ -137,15 +143,18 @@ body,
   cursor: pointer;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 20;
 }
-.mode-toggle:hover {
+.topbar-btn:hover {
   background: rgba(34, 46, 62, 0.85);
 }
-.mode-toggle.is-camera {
+.topbar-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.topbar-btn.is-active {
+  color: #fff;
   background: rgba(48, 100, 160, 0.92);
   border-color: rgba(120, 180, 240, 0.65);
-  color: #fff;
 }
 
 /* --- カメラ視点HUD（下中央） --- */
@@ -251,31 +260,7 @@ body,
 }
 
 /* ホームへ戻る（左上・メニューの右） */
-.locate-btn {
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 8px));
-  left: calc(max(8px, env(safe-area-inset-left, 8px)) + 100px);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  color: #e6edf5;
-  background: rgba(18, 24, 33, 0.78);
-  border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 10px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: 23;
-}
-.locate-btn:hover {
-  background: rgba(34, 46, 62, 0.85);
-}
-.locate-btn:disabled {
-  opacity: 0.7;
-  cursor: default;
-}
+/* GPS失敗時の注意（上部バーの下に出す） */
 .locate-warn {
   position: absolute;
   top: calc(max(8px, env(safe-area-inset-top, 8px)) + 50px);
@@ -289,10 +274,11 @@ body,
   border-radius: 9px;
   z-index: 23;
 }
+/* ホーム（右上の右端。押し間違い防止で左の操作群と離す）。 */
 .home-btn {
   position: absolute;
   top: max(8px, env(safe-area-inset-top, 8px));
-  left: calc(max(8px, env(safe-area-inset-left, 8px)) + 50px);
+  right: max(8px, env(safe-area-inset-right, 8px));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -309,27 +295,6 @@ body,
 }
 .home-btn:hover {
   background: rgba(28, 36, 48, 0.88);
-}
-
-/* --- メニュー開閉ボタン（左上） --- */
-.menu-toggle {
-  position: absolute;
-  top: max(8px, env(safe-area-inset-top, 8px));
-  left: max(8px, env(safe-area-inset-left, 8px));
-  width: 42px;
-  height: 42px;
-  font-size: 20px;
-  color: #e6edf5;
-  background: rgba(18, 24, 33, 0.78);
-  border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 10px;
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)でも常に押せるように */
-}
-.menu-toggle:hover {
-  background: rgba(34, 46, 62, 0.85);
 }
 
 /* 自由視点切替（右下クラスタ内・リモコンの下） */

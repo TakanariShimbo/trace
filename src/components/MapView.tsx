@@ -2217,46 +2217,64 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </svg>
       )}
 
-      {/* メニュー開閉（左上） */}
-      <button
-        className="menu-toggle"
-        title="メニュー"
-        aria-label="メニュー"
-        onClick={() => setSidebarOpen((o) => !o)}
-      >
-        ☰
-      </button>
+      {/* 上部アイコンバー（左上）。メニュー・現在地・カメラ・2D3D・自由視点をアイコンのみで横並び。 */}
+      <div className="topbar">
+        <button
+          className="topbar-btn"
+          title="メニュー"
+          aria-label="メニュー"
+          onClick={() => setSidebarOpen((o) => !o)}
+        >
+          ☰
+        </button>
+        {mode === "map" && (
+          <button
+            className="topbar-btn"
+            title="現在地へ移動"
+            aria-label="現在地へ移動"
+            onClick={goToCurrentLocation}
+            disabled={locating}
+          >
+            {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
+          </button>
+        )}
+        {appMode === "simulation" && (
+          <button
+            className={`topbar-btn${mode === "camera" ? " is-active" : ""}`}
+            title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
+            aria-label={mode === "map" ? "カメラ視点" : "地図に戻る"}
+            onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
+          >
+            {mode === "map" ? <IconCamera size={18} /> : <IconMap size={18} />}
+          </button>
+        )}
+        {mode === "map" && (
+          <button
+            className="topbar-btn"
+            title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
+            aria-label={map2D ? "3D表示に切り替え" : "2D表示に切り替え"}
+            onClick={() => setMap2D((v) => !v)}
+          >
+            {map2D ? <IconCube size={18} /> : <IconGrid size={18} />}
+          </button>
+        )}
+        {appMode === "simulation" && mode === "map" && (
+          <button
+            className={`topbar-btn${freeLook ? " is-active" : ""}`}
+            title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
+            aria-label="自由視点"
+            onClick={toggleFreeLook}
+          >
+            <IconEye size={18} />
+          </button>
+        )}
+      </div>
+      {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
 
-      {/* ホームへ戻る（左上・メニューの右） */}
+      {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
       <button className="home-btn" title="ホーム画面へ戻る" aria-label="ホーム" onClick={onHome}>
         <IconHome size={18} />
       </button>
-
-      {/* 現在地へ移動（左上・ホームの右）。アイコンのみ（サイドバーから表へ）。 */}
-      {mode === "map" && (
-        <button
-          className="locate-btn"
-          title="現在地へ移動"
-          aria-label="現在地へ移動"
-          onClick={goToCurrentLocation}
-          disabled={locating}
-        >
-          {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
-        </button>
-      )}
-      {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
-
-      {/* 地図⇄カメラ視点の切替（右上）。ARでは視点遷移をウィザードが担うので出さない。 */}
-      {appMode === "simulation" && (
-        <button
-          className={`mode-toggle${mode === "camera" ? " is-camera" : ""}`}
-          title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
-          onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
-        >
-          {mode === "map" ? <IconCamera size={16} /> : <IconMap size={16} />}
-          <span>{mode === "map" ? "カメラ視点" : "地図に戻る"}</span>
-        </button>
-      )}
 
 
       {/* 山頂選択の一括解除チップ（シミュレーションのみ。ARは選択フェーズのUIで扱う） */}
@@ -2710,18 +2728,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </section>
       </aside>
 
-      {/* 右下クラスタ（マップモードのみ）: リモコン＋その下に自由視点 */}
+      {/* 右下クラスタ（マップモードのみ）: リモコン＋撮影地点に戻る（2D/3D・自由視点は上部バーへ移動） */}
       {mode === "map" && (
         <div className="controls-br">
-          {/* 2D(真上の地図)/3D(傾けられる地形) 切替。場所決めは2Dが楽。ボタンは切替先を表示。 */}
-          <button
-            className="freelook-toggle"
-            title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
-            onClick={() => setMap2D((v) => !v)}
-          >
-            {map2D ? <IconCube size={15} /> : <IconGrid size={15} />}
-            <span>{map2D ? "3D" : "2D"}</span>
-          </button>
           {showRemote && (
             <div className="nav-controls">
           <div className="nav-row">
@@ -2766,17 +2775,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </button>
           </div>
             </div>
-          )}
-          {/* 自由視点（リモコンの下）。ARでは機能しないので出さない。 */}
-          {appMode === "simulation" && (
-            <button
-              className={`freelook-toggle${freeLook ? " is-active" : ""}`}
-              title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
-              onClick={toggleFreeLook}
-            >
-              <IconEye size={15} />
-              <span>{freeLook ? "自由視点：ON" : "自由視点"}</span>
-            </button>
           )}
           {/* AR/ライブ: 自由に見て回った後、地点へ視点を戻す（自由視点の代わり）。 */}
           {arLike && arLoc && mode === "map" && (
