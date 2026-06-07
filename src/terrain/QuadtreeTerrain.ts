@@ -103,6 +103,18 @@ export class QuadtreeTerrain {
     center: { value: new THREE.Vector2() },
     radius: { value: 0 },
   };
+  // 視野コーン・デカール用の共有ユニフォーム（全タイル材質が参照）。
+  // 地形フラグメントごとに「扇の内側か」を判定し、地表テクスチャに色を重ねる
+  // （真のデカール：地形に完全追従・浮きやサンプル誤差なし）。
+  private cone = {
+    on: { value: 0 },
+    apex: { value: new THREE.Vector2() }, // 撮影地点のワールドXZ
+    dir: { value: 0 }, // 方位(rad, 0=北, 時計回り)
+    half: { value: 0 }, // 画角の半分(rad)
+    radius: { value: 0 }, // 扇の長さ(world)
+    color: { value: new THREE.Color(0.37, 0.63, 0.9) },
+    fillAlpha: { value: 0.34 }, // 中心の塗り濃さ（外周へ0）
+  };
   // 現在ドレープしているベースマップ。setBasemap で切替（タイルを貼り直す）。
   private basemap: Basemap;
   // ベースマップ世代。切替時に +1 し、古い世代の読込結果は捨てる。
@@ -401,12 +413,19 @@ export class QuadtreeTerrain {
     return mesh;
   }
 
-  /** 地形マテリアルに「観測点中心・半径Rの円の外側を捨てる」シェーダを注入。 */
+  /** 地形マテリアルに、円盤クリップ＋視野コーン・デカールのシェーダを注入。 */
   private applyClipShader(material: THREE.MeshStandardMaterial): void {
     material.onBeforeCompile = (shader) => {
       shader.uniforms.uClipOn = this.clip.on;
       shader.uniforms.uClipCenter = this.clip.center;
       shader.uniforms.uClipRadius = this.clip.radius;
+      shader.uniforms.uConeOn = this.cone.on;
+      shader.uniforms.uConeApex = this.cone.apex;
+      shader.uniforms.uConeDir = this.cone.dir;
+      shader.uniforms.uConeHalf = this.cone.half;
+      shader.uniforms.uConeR = this.cone.radius;
+      shader.uniforms.uConeColor = this.cone.color;
+      shader.uniforms.uConeFillA = this.cone.fillAlpha;
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nvarying vec2 vClipXZ;")
         .replace(
@@ -416,13 +435,50 @@ export class QuadtreeTerrain {
       shader.fragmentShader = shader.fragmentShader
         .replace(
           "#include <common>",
-          "#include <common>\nvarying vec2 vClipXZ;\nuniform float uClipOn;\nuniform vec2 uClipCenter;\nuniform float uClipRadius;",
+          "#include <common>\nvarying vec2 vClipXZ;\n" +
+            "uniform float uClipOn;\nuniform vec2 uClipCenter;\nuniform float uClipRadius;\n" +
+            "uniform float uConeOn;\nuniform vec2 uConeApex;\nuniform float uConeDir;\nuniform float uConeHalf;\n" +
+            "uniform float uConeR;\nuniform vec3 uConeColor;\nuniform float uConeFillA;",
         )
         .replace(
           "#include <clipping_planes_fragment>",
           "#include <clipping_planes_fragment>\n  if (uClipOn > 0.5 && distance(vClipXZ, uClipCenter) > uClipRadius) discard;",
+        )
+        // 地表テクスチャに扇を重ねる（最終色 gl_FragColor を上書き）。地形に完全追従＝真のデカール。
+        .replace(
+          "#include <dithering_fragment>",
+          [
+            "#include <dithering_fragment>",
+            "if (uConeOn > 0.5) {",
+            "  vec2 cp = vClipXZ - uConeApex;",
+            "  float cd = length(cp);",
+            "  if (cd < uConeR) {",
+            "    float ang = atan(cp.x, -cp.y);", // フラグメントの方位(0=北=-Z, 東=+X, 時計回り)
+            "    float da = ang - uConeDir; da = atan(sin(da), cos(da));", // -pi..pi に正規化
+            "    if (abs(da) <= uConeHalf) {",
+            "      float fade = 1.0 - cd / uConeR;", // 中心(apex)濃い→外周0
+            "      float edge = smoothstep(0.0, 0.04, uConeHalf - abs(da));", // 扇の縁を少しなめらかに
+            "      float a = uConeFillA * fade * edge;", // 塗りのみ（中心・両端の線は描かない）
+            "      gl_FragColor.rgb = mix(gl_FragColor.rgb, uConeColor, a);",
+            "    }",
+            "  }",
+            "}",
+          ].join("\n"),
         );
     };
+  }
+
+  /** 視野コーン・デカールを設定。null で消す。center/dir/half/radius はワールド/ラジアン。 */
+  setViewCone(p: { x: number; z: number; dir: number; half: number; radius: number } | null): void {
+    if (!p) {
+      this.cone.on.value = 0;
+      return;
+    }
+    this.cone.on.value = 1;
+    this.cone.apex.value.set(p.x, p.z);
+    this.cone.dir.value = p.dir;
+    this.cone.half.value = p.half;
+    this.cone.radius.value = p.radius;
   }
 
   /** 地形を観測点中心・半径(ワールド)の円盤に切り抜く。null で解除（全面表示）。 */

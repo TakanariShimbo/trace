@@ -459,144 +459,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     previewRing.visible = false;
     scene.add(previewRing);
 
-    // --- AR向き決め: 撮影地点から「写る方向・範囲」を示す視野コーン（扇形）を地図に描く --- //
-    // 扇は地形に沿わせて（ドレープ）地図に貼り付ける。2D/3Dとも同じ見た目で、3Dでは手前の尾根が
-    // 扇を遮り、高い山は扇を突き抜けるので「地面に直接描いた」ように見える（プリズムや高い面は使わない）。
-    const VC_N = 28; // 角度（扇の弧）の分割数
-    const VC_NR = 16; // 半径方向の分割数（細かいほど地表に密着。レイキャスト数とのバランス）
-    const VIEWCONE_R = 180; // コーンの長さ(world)の上限。線を遠くまで伸ばして方向を示す
-    const VC_COL = { r: 0.37, g: 0.63, b: 0.9 }; // 塗り・線の共通色
-    const VC_APEX_ALPHA = 0.34; // 塗りの中心の濃さ（外周へ0でフェード）
-    const VC_LINE_ALPHA = 0.5; // 線（中心・両端）の中心の濃さ（外周へ0）
-    // 頂点はレイキャストで「表示中の地表」に乗せる。持ち上げはほぼ0にして地面に貼り付かせ、
-    // z-fight は polygonOffset で回避（持ち上げると3Dで浮いて見えるため）。
-    const vcLift = elevToWorldY(2);
-    const vcLineLift = elevToWorldY(5); // 線は塗りのごくわずか上（塗りに埋もれさせない）
-    const gv = (r: number, i: number) => r * (VC_N + 1) + i; // 塗りグリッドの頂点番号（リングr×列i）
-    // 塗り（扇）: (VC_NR+1)リング × (VC_N+1)列 の三角形グリッドを地表にドレープ。
-    const viewConePos = new Float32Array((VC_NR + 1) * (VC_N + 1) * 3);
-    const viewConeGeom = new THREE.BufferGeometry();
-    viewConeGeom.setAttribute("position", new THREE.BufferAttribute(viewConePos, 3));
-    {
-      // 頂点アルファで中心(濃い)→外周(透明)。色は一定なので初期化時に一度設定。
-      const col = new Float32Array((VC_NR + 1) * (VC_N + 1) * 4);
-      for (let r = 0; r <= VC_NR; r++) {
-        const a = VC_APEX_ALPHA * (1 - r / VC_NR);
-        for (let i = 0; i <= VC_N; i++) {
-          const o = gv(r, i) * 4;
-          col[o] = VC_COL.r; col[o + 1] = VC_COL.g; col[o + 2] = VC_COL.b; col[o + 3] = a;
-        }
-      }
-      viewConeGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
-    }
-    {
-      const idx: number[] = [];
-      for (let r = 0; r < VC_NR; r++) {
-        for (let i = 0; i < VC_N; i++) {
-          const a = gv(r, i), b = gv(r, i + 1), c = gv(r + 1, i + 1), d = gv(r + 1, i);
-          idx.push(a, b, c, a, c, d);
-        }
-      }
-      viewConeGeom.setIndex(idx);
-    }
-    const viewCone = new THREE.Mesh(
-      viewConeGeom,
-      new THREE.MeshBasicMaterial({
-        vertexColors: true, // 中心→外へグラデーション（頂点アルファ）
-        transparent: true,
-        depthTest: true, // 地形に正しく隠れる（地面に貼り付いて見える）
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        polygonOffset: true, // 地表との z-fight を避けて手前に寄せる（地面に貼り付かせる）
-        polygonOffsetFactor: -4,
-        polygonOffsetUnits: -4,
-      }),
-    );
-    viewCone.renderOrder = 998;
-    viewCone.frustumCulled = false;
-    viewCone.visible = false;
-    scene.add(viewCone);
-    // 画角の「中心」と「両端」の3本の線も地形に沿わせて apex→遠端 で引く（塗りと同色・同フェード）。
-    // 各本を VC_NR 区間に分割（LineSegments は2点ごとに1線分）。
-    const VC_LINES = 3;
-    const viewConeLinePos = new Float32Array(VC_LINES * VC_NR * 2 * 3);
-    const viewConeLineGeom = new THREE.BufferGeometry();
-    viewConeLineGeom.setAttribute("position", new THREE.BufferAttribute(viewConeLinePos, 3));
-    {
-      const col = new Float32Array(VC_LINES * VC_NR * 2 * 4);
-      const lineAlpha = (t: number) => VC_LINE_ALPHA * (1 - t);
-      for (let k = 0; k < VC_LINES; k++) {
-        for (let s = 0; s < VC_NR; s++) {
-          const base = (k * VC_NR + s) * 2;
-          const oA = base * 4, oB = (base + 1) * 4;
-          col[oA] = VC_COL.r; col[oA + 1] = VC_COL.g; col[oA + 2] = VC_COL.b; col[oA + 3] = lineAlpha(s / VC_NR);
-          col[oB] = VC_COL.r; col[oB + 1] = VC_COL.g; col[oB + 2] = VC_COL.b; col[oB + 3] = lineAlpha((s + 1) / VC_NR);
-        }
-      }
-      viewConeLineGeom.setAttribute("color", new THREE.BufferAttribute(col, 4));
-    }
-    const viewConePlanes = new THREE.LineSegments(
-      viewConeLineGeom,
-      new THREE.LineBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        depthTest: true, // 線も地形に隠れる（地面に沿う）
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -6,
-        polygonOffsetUnits: -6,
-      }),
-    );
-    viewConePlanes.renderOrder = 999;
-    viewConePlanes.frustumCulled = false;
-    viewConePlanes.visible = false;
-    scene.add(viewConePlanes);
-    // 視野コーンを撮影地点・方向・画角に合わせて作り直す（地形に沿わせて貼る）。
+    // --- AR向き決め: 撮影地点から「写る方向・範囲」を示す視野コーン（扇形）--- //
+    // 真のデカール方式: 地形マテリアルのフラグメントシェーダで「このピクセルは扇の内側か」を
+    // 判定して地表テクスチャに色を重ねる（QuadtreeTerrain.setViewCone）。地形に完全追従し、
+    // 浮き・サンプル誤差・z-fight が原理的に無い。更新は uniform 書き換えのみで軽い。
+    const VIEWCONE_R = 180; // コーンの長さ(world)の上限。
     const updateViewCone = (ex: number, ez: number, headingDeg: number, fovDeg: number) => {
       const half = (Math.min(Math.max(fovDeg, 1), 175) / 2) * (Math.PI / 180);
-      const h0 = (headingDeg * Math.PI) / 180;
-      // 長さはズーム連動だが、方向が分かるよう遠くまで伸ばす（塗りは途中で透過するので長くてOK）。
+      const dir = (headingDeg * Math.PI) / 180;
+      // 長さはズーム連動だが、方向が分かるよう遠くまで伸ばす（外周は透過するので長くてOK）。
       const R = THREE.MathUtils.clamp(camera.position.distanceTo(controls.target) * 2.2, 40, VIEWCONE_R);
-      // 塗りグリッドを地表へドレープ。apex(r=0)は1点なので1回だけサンプリングして全列に複製。
-      const apexY = sampleSurfaceY(ex, ez) + vcLift;
-      for (let i = 0; i <= VC_N; i++) {
-        const o = gv(0, i) * 3;
-        viewConePos[o] = ex; viewConePos[o + 1] = apexY; viewConePos[o + 2] = ez;
-      }
-      for (let r = 1; r <= VC_NR; r++) {
-        const radius = R * (r / VC_NR); // 等間隔リングで全体を均一に地表へ追従させる
-        for (let i = 0; i <= VC_N; i++) {
-          const a = h0 - half + (2 * half * i) / VC_N; // 方位角（0=北=-Z）
-          const x = ex + radius * Math.sin(a);
-          const z = ez - radius * Math.cos(a);
-          const o = gv(r, i) * 3;
-          viewConePos[o] = x;
-          viewConePos[o + 1] = sampleSurfaceY(x, z) + vcLift;
-          viewConePos[o + 2] = z;
-        }
-      }
-      // 3本の線は塗りグリッドの列から取り出す（追加レイキャスト無し）。中心=中央列 / 左=0 / 右=VC_N。
-      const cols = [VC_N >> 1, 0, VC_N];
-      for (let k = 0; k < VC_LINES; k++) {
-        const iCol = cols[k];
-        for (let s = 0; s < VC_NR; s++) {
-          const gA = gv(s, iCol) * 3;
-          const gB = gv(s + 1, iCol) * 3;
-          const base = (k * VC_NR + s) * 2 * 3;
-          viewConeLinePos[base] = viewConePos[gA];
-          viewConeLinePos[base + 1] = viewConePos[gA + 1] + (vcLineLift - vcLift);
-          viewConeLinePos[base + 2] = viewConePos[gA + 2];
-          viewConeLinePos[base + 3] = viewConePos[gB];
-          viewConeLinePos[base + 4] = viewConePos[gB + 1] + (vcLineLift - vcLift);
-          viewConeLinePos[base + 5] = viewConePos[gB + 2];
-        }
-      }
-      viewConeLineGeom.attributes.position.needsUpdate = true;
-      viewConeGeom.attributes.position.needsUpdate = true;
-      viewConeGeom.computeBoundingSphere();
-      viewConeLineGeom.computeBoundingSphere();
-      viewCone.visible = true;
-      viewConePlanes.visible = true;
+      terrain.setViewCone({ x: ex, z: ez, dir, half, radius: R });
     };
 
     const getCenter = (): LonLat | null => {
@@ -801,8 +674,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         updateViewCone(mercXToWorld(lonToMercX(lon)), mercYToWorld(latToMercY(lat)), headingDeg, fovDeg);
       },
       hideViewCone: () => {
-        viewCone.visible = false;
-        viewConePlanes.visible = false;
+        terrain.setViewCone(null);
       },
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
@@ -1166,10 +1038,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       apiRef.current = null;
       previewRing.geometry.dispose();
       (previewRing.material as THREE.Material).dispose();
-      viewCone.geometry.dispose();
-      (viewCone.material as THREE.Material).dispose();
-      viewConePlanes.geometry.dispose();
-      (viewConePlanes.material as THREE.Material).dispose();
       celestial.dispose();
       skyDome.dispose();
       peaks.dispose();
@@ -1259,19 +1127,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   }, [photoUrl]);
 
   // 向き決め(②)・山選択(③)の俯瞰中、視野コーンを地図に描画（写る方向の山を選びやすく）。
-  // 地形にドレープするので2D/3D共通の見た目。dimは関与しない。
-  // ドレープは頂点ごとに地表をレイキャストするため、FOVスライダー等の連続変更は
-  // デバウンスして負荷を吸収（指を止めた所で貼り直す）。
+  // 地形シェーダのデカール（uniform書き換えのみ）なので2D/3D共通・即時・軽量。
   useEffect(() => {
-    if (!(arLike && (arStep === "params" || arStep === "select") && arLoc)) {
+    if (arLike && (arStep === "params" || arStep === "select") && arLoc) {
+      apiRef.current?.setViewCone(arLoc.lon, arLoc.lat, arHeadingDeg ?? 0, arFovDeg);
+    } else {
       apiRef.current?.hideViewCone();
-      return;
     }
-    const { lon, lat } = arLoc;
-    const h = arHeadingDeg ?? 0;
-    const fov = arFovDeg;
-    const id = setTimeout(() => apiRef.current?.setViewCone(lon, lat, h, fov), 60);
-    return () => clearTimeout(id);
   }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg]);
 
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
