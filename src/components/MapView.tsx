@@ -2240,7 +2240,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "ar" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む（画角は②で設定）。
+                選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。
               </span>
               <div className="ar-dock-actions">
                 <button
@@ -2266,7 +2266,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "live" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認（傾きは端末を傾けて／画角は②で設定）。
+                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。
               </span>
               <div className="ar-dock-actions">
                 <button
