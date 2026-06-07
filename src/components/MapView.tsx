@@ -303,7 +303,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const camera = new THREE.PerspectiveCamera(
       MAP_FOV,
       mount.clientWidth / mount.clientHeight,
-      0.05,
+      // near=0.0002(≒0.2m)。世界座標は1単位=1kmなので 0.05 だと約50mより手前の地形が
+      // ニア面で切り取られ、足元（手前）が抜けてその下が透けて見えてしまう。
+      // logarithmicDepthBuffer:true なので near を小さくしても深度精度は保てる。
+      0.0002,
       9000,
     );
     camera.position.set(0, 2200, 2600);
