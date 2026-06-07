@@ -874,13 +874,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       p.x = e.clientX;
       p.y = e.clientY;
       if (pointers.size >= 2) {
-        // 2本指ピンチ＝画角。指を開く(距離↑)=ズームイン=fov減。
-        const d = pinchDistance();
-        if (pinchDist > 0 && d > 0) {
-          cam.fov = THREE.MathUtils.clamp(cam.fov * (pinchDist / d), CAM_FOV_MIN, CAM_FOV_MAX);
-          setCamFov(cam.fov);
+        // 2本指ピンチ＝画角（シミュレーションのみ）。AR/ライブは撮影時/②で決めた画角を固定。
+        if (appModeRef.current === "simulation") {
+          const d = pinchDistance();
+          if (pinchDist > 0 && d > 0) {
+            cam.fov = THREE.MathUtils.clamp(cam.fov * (pinchDist / d), CAM_FOV_MIN, CAM_FOV_MAX);
+            setCamFov(cam.fov);
+          }
+          pinchDist = d;
         }
-        pinchDist = d;
       } else {
         // 1本指＝向き（ズーム(小fov)ほど感度を下げる）。実際の縦画角(camera.fov)基準。
         const degPerPx = camera.fov / mount.clientHeight;
@@ -897,6 +899,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const onCamWheel = (e: WheelEvent) => {
       if (!cameraMode) return;
       e.preventDefault();
+      if (appModeRef.current !== "simulation") return; // AR/ライブは画角固定（②で変更）
       cam.fov = THREE.MathUtils.clamp(cam.fov + Math.sign(e.deltaY) * 3, CAM_FOV_MIN, CAM_FOV_MAX);
       setCamFov(cam.fov);
     };
@@ -2229,17 +2232,19 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               onChange={(e) => changeCamEyeHeight(Number(e.target.value))}
             />
           </label>
-          {/* 横画角スライダー（1度単位で微調整。スクロール/ピンチと同じ値。シミュ・AR共通） */}
-          <label className="cam-eye">
-            <span>横画角 {Math.round(camFov)}°（望遠 ←→ 広角）</span>
-            <input
-              type="range"
-              min={CAM_FOV_MIN}
-              max={CAM_FOV_MAX}
-              value={Math.round(camFov)}
-              onChange={(e) => changeCamFov(Number(e.target.value))}
-            />
-          </label>
+          {/* 横画角スライダー（シミュレーションのみ）。AR/ライブは撮影時/②で決めた画角を固定。 */}
+          {appMode === "simulation" && (
+            <label className="cam-eye">
+              <span>横画角 {Math.round(camFov)}°（望遠 ←→ 広角）</span>
+              <input
+                type="range"
+                min={CAM_FOV_MIN}
+                max={CAM_FOV_MAX}
+                value={Math.round(camFov)}
+                onChange={(e) => changeCamFov(Number(e.target.value))}
+              />
+            </label>
+          )}
           {/* 水平の傾き（ロール）補正。向きは変えずビュー軸まわりに回すだけ（シミュ・AR共通） */}
           <label className="cam-eye">
             <span>水平の傾き {camRoll}°（左 ←→ 右）</span>
@@ -2302,7 +2307,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "ar" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                選んだ山名が写真に重なります。ドラッグで向き・ピンチ/ホイールで画角を合わせ込む。
+                選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む（画角は②で設定）。
               </span>
               <div className="ar-phase-foot-row">
                 <button className="ar-btn-sub" onClick={backToSelect}>
@@ -2320,7 +2325,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "live" && arStep === "align" && (
             <div className="ar-phase-foot">
               <span className="cam-hint">
-                選んだ山名がカメラ映像に重なります。ドラッグで向き・ピンチ/ホイールで画角・スライダーで傾きを合わせて確認。
+                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで傾きを合わせて確認（画角は②で設定）。
               </span>
               <div className="ar-phase-foot-row">
                 <button className="ar-btn-sub" onClick={backToSelect}>
