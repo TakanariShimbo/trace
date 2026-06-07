@@ -667,6 +667,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
 
     // 指定地点へ滑らかに移動（視線方向を保ったまま一定距離まで寄る）。applyNav が補間する。
     let flyGoal: { pos: THREE.Vector3; target: THREE.Vector3 } | null = null;
+    let pending2DLock = false; // 2Dへのフライト完了後に真上固定(クランプ)を掛けるための予約
     const flyTo = (c: LonLat) => {
       const target = new THREE.Vector3(
         mercXToWorld(lonToMercX(c.lon)),
@@ -831,26 +832,28 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         controls.mouseButtons.LEFT = rotateOnLeft ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN;
         controls.touches.ONE = rotateOnLeft ? THREE.TOUCH.ROTATE : THREE.TOUCH.PAN;
       },
-      // 地図(俯瞰)の2D/3D切替。2D=真上固定で傾け不可、3D=俯瞰角へ傾けて自由回転。
+      // 地図(俯瞰)の2D/3D切替。フライト（滑らかな傾き移動）で行う。
+      // 2D=真上固定で傾け不可、3D=俯瞰角へ傾けて自由回転。
       setMapDimension: (dim) => {
         map2DRef.current = dim === "2d";
-        if (dim === "2d") {
-          controls.maxPolarAngle = 0.0001; // 真上に固定（次のupdateで真上へ）
-          controls.enableRotate = false;
-        } else {
-          controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
-          controls.enableRotate = true;
-          // 真上→俯瞰角(55°)へ傾ける。北上のまま。
-          const dist = camera.position.distanceTo(controls.target);
-          const polar = THREE.MathUtils.degToRad(55);
-          camera.position.set(
-            controls.target.x,
-            controls.target.y + dist * Math.cos(polar),
-            controls.target.z + dist * Math.sin(polar),
-          );
-        }
         camera.up.set(0, 1, 0);
-        controls.update();
+        const t = controls.target;
+        const dist = camera.position.distanceTo(t);
+        // 飛行中はクランプを外す（外さないとスナップして飛行にならない）。
+        controls.maxPolarAngle = THREE.MathUtils.degToRad(85);
+        if (dim === "2d") {
+          controls.enableRotate = false;
+          pending2DLock = true; // 飛行完了後に真上固定を掛ける
+          flyGoal = { pos: new THREE.Vector3(t.x, t.y + dist, t.z), target: t.clone() };
+        } else {
+          controls.enableRotate = true;
+          pending2DLock = false;
+          const polar = THREE.MathUtils.degToRad(55); // 俯瞰角
+          flyGoal = {
+            pos: new THREE.Vector3(t.x, t.y + dist * Math.cos(polar), t.z + dist * Math.sin(polar)),
+            target: t.clone(),
+          };
+        }
       },
       setViewCone: (lon, lat, headingDeg, fovDeg) => {
         updateViewCone(mercXToWorld(lonToMercX(lon)), mercYToWorld(latToMercY(lat)), headingDeg, fovDeg);
@@ -1045,6 +1048,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           camera.position.copy(flyGoal.pos);
           controls.target.copy(flyGoal.target);
           flyGoal = null;
+          if (pending2DLock) {
+            controls.maxPolarAngle = 0.0001; // 2D飛行が終わってから真上に固定
+            pending2DLock = false;
+          }
         }
         return;
       }
@@ -2225,6 +2232,20 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         <IconHome size={18} />
       </button>
 
+      {/* 現在地へ移動（左上・ホームの右）。アイコンのみ（サイドバーから表へ）。 */}
+      {mode === "map" && (
+        <button
+          className="locate-btn"
+          title="現在地へ移動"
+          aria-label="現在地へ移動"
+          onClick={goToCurrentLocation}
+          disabled={locating}
+        >
+          {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
+        </button>
+      )}
+      {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
+
       {/* 地図⇄カメラ視点の切替（右上）。ARでは視点遷移をウィザードが担うので出さない。 */}
       {appMode === "simulation" && (
         <button
@@ -2439,11 +2460,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </button>
           </form>
 
-          <button className="save-btn" onClick={goToCurrentLocation} disabled={locating}>
-            {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={16} />}
-            {locating ? "取得中…" : "現在地へ移動"}
-          </button>
-          {locError && <div className="save-warn">{locError}</div>}
+          {/* 現在地へ移動は画面左上のアイコンボタンに出している（サイドバー外） */}
           {results.length > 0 && (
             <ul className="search-results">
               {results.map((r, i) => (
