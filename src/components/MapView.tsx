@@ -2291,7 +2291,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </button>
               ) : (
                 <label className="cam-photo-opacity">
-                  <span>写真の不透明度 {Math.round(photoOpacity * 100)}%</span>
+                  <span>写真の不透明度 {Math.round(photoOpacity * 100)}%（シミュレーション ←→ 写真）</span>
                   <input
                     type="range"
                     min={0}
@@ -2307,7 +2307,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {appMode === "live" && (
             <div className="cam-photo">
               <label className="cam-photo-opacity">
-                <span>カメラ映像の不透明度 {Math.round(photoOpacity * 100)}%</span>
+                <span>カメラ映像の不透明度 {Math.round(photoOpacity * 100)}%（シミュレーション ←→ カメラ）</span>
                 <input
                   type="range"
                   min={0}
