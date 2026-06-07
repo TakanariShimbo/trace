@@ -1217,17 +1217,35 @@ body,
 }
 
 /* 撮影地点ピン（地表に追従。下端が地点を指す） */
+/* ピンのアンカー（0サイズの点）をDEM表面の投影点ちょうどに置く（reticleと同じ接地方式）。
+   接地ドットを点に重ね、ピン先端をそのドットに載せるので、傾けても浮いて見えない。 */
 .ar-pin {
   position: absolute;
-  /* ピン先端（アイコン高さの約87.5%の位置）を撮影地点に合わせる＝DEM表面にちょうど刺さる */
-  transform: translate(-50%, -87.5%);
-  color: #ff5a3c;
+  width: 0;
+  height: 0;
   pointer-events: none;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
   z-index: 6;
 }
-.ar-pin svg {
-  display: block; /* インラインSVGの下余白を消し、要素高さ＝アイコン高さにする */
+.ar-pin-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(-50%, -50%); /* 撮影地点ちょうど（地表に接地） */
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff5a3c;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+.ar-pin-icon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  /* アイコン先端(高さの約87.5%)を接地点に合わせる＝先端がドットに刺さる */
+  transform: translate(-50%, -87.5%);
+  color: #ff5a3c;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
 }
 
 /* 下部の決定バー（地点/情報フェーズ共通） */

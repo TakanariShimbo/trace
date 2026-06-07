@@ -1780,7 +1780,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {/* 撮影地点ピン（AR地図フェーズ：地点/向き決め/山選択で表示。位置はループが追従） */}
       {appMode === "ar" && mode === "map" && (
         <div ref={arPinElRef} className="ar-pin" style={{ display: "none" }}>
-          <IconPin size={30} />
+          <span className="ar-pin-dot" />
+          <IconPin className="ar-pin-icon" size={30} />
         </div>
       )}
 
