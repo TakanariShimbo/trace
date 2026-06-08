@@ -2359,7 +2359,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                       : "撮影地点を選んでください — 地図をタップ、または下の検索で指定"}
                 </span>
               </div>
-              {appMode !== "live" && searchPanel}
+              {appMode !== "live" && dockSection("arsearch", "検索", searchPanel)}
               <div className="ar-dock-actions">
                 {appMode === "live" ? (
                   <button className="ar-btn-sub" onClick={restartLive}>
@@ -2402,31 +2402,37 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                     : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。"}
                 </span>
               </div>
-              <div className="cam-readout">
-                <div className="cam-stat">
-                  <span>方向</span>
-                  <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
-                </div>
-                <div className="cam-stat">
-                  <span>横画角</span>
-                  <b>{Math.round(arFovDeg)}°</b>
-                </div>
-              </div>
-              {appMode === "live" && (
-                <button
-                  className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`}
-                  onClick={() => setLiveFollow((v) => !v)}
-                >
-                  <IconLocate size={14} />
-                  {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
-                </button>
-              )}
-              {camSlider(
+              {dockSection(
+                "arparams",
+                "向き・画角",
                 <>
-                  画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+                  <div className="cam-readout">
+                    <div className="cam-stat">
+                      <span>方向</span>
+                      <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
+                    </div>
+                    <div className="cam-stat">
+                      <span>横画角</span>
+                      <b>{Math.round(arFovDeg)}°</b>
+                    </div>
+                  </div>
+                  {appMode === "live" && (
+                    <button
+                      className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`}
+                      onClick={() => setLiveFollow((v) => !v)}
+                    >
+                      <IconLocate size={14} />
+                      {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
+                    </button>
+                  )}
+                  {camSlider(
+                    <>
+                      画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+                    </>,
+                    `${Math.round(arFovDeg)}°`,
+                    <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
+                  )}
                 </>,
-                `${Math.round(arFovDeg)}°`,
-                <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
               )}
               <div className="ar-dock-actions">
                 <button
@@ -2677,34 +2683,40 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                   {stageZoomControls}
                 </div>
               )}
-              {cameraReadout}
-              {eyeSlider}
-              {appMode !== "live" && rollSlider}
-              {appMode === "ar" &&
-                (!photoUrl ? (
-                  <div className="cam-photo">
-                    <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
-                      <IconImage size={15} />
-                      <span>写真を重ねて合わせる</span>
-                    </button>
-                  </div>
-                ) : (
-                  camSlider(
-                    <>
-                      写真の濃さ <i className="cam-eye-sub">シミュ ←→ 写真</i>
-                    </>,
-                    `${Math.round(photoOpacity * 100)}%`,
-                    <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
-                  )
-                ))}
-              {appMode === "live" &&
-                camSlider(
-                  <>
-                    カメラ映像の濃さ <i className="cam-eye-sub">シミュ ←→ カメラ</i>
-                  </>,
-                  `${Math.round(photoOpacity * 100)}%`,
-                  <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
-                )}
+              {dockSection(
+                "aradjust",
+                "カメラ設定",
+                <>
+                  {cameraReadout}
+                  {eyeSlider}
+                  {appMode !== "live" && rollSlider}
+                  {appMode === "ar" &&
+                    (!photoUrl ? (
+                      <div className="cam-photo">
+                        <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
+                          <IconImage size={15} />
+                          <span>写真を重ねて合わせる</span>
+                        </button>
+                      </div>
+                    ) : (
+                      camSlider(
+                        <>
+                          写真の濃さ <i className="cam-eye-sub">シミュ ←→ 写真</i>
+                        </>,
+                        `${Math.round(photoOpacity * 100)}%`,
+                        <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
+                      )
+                    ))}
+                  {appMode === "live" &&
+                    camSlider(
+                      <>
+                        カメラ映像の濃さ <i className="cam-eye-sub">シミュ ←→ カメラ</i>
+                      </>,
+                      `${Math.round(photoOpacity * 100)}%`,
+                      <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
+                    )}
+                </>,
+              )}
               {appMode === "ar" && arStep === "align" && (
                 <div className="ar-phase-foot">
                   <span className="cam-hint">
