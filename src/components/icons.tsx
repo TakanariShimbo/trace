@@ -234,6 +234,19 @@ export function IconGrid({ size = 16, className }: Props) {
   );
 }
 
+/** 四方向矢印（移動／パン）。 */
+export function IconMove({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M12 3 L12 21 M3 12 L21 12" />
+      <path d="M12 3 L9.5 5.5 M12 3 L14.5 5.5" />
+      <path d="M12 21 L9.5 18.5 M12 21 L14.5 18.5" />
+      <path d="M3 12 L5.5 9.5 M3 12 L5.5 14.5" />
+      <path d="M21 12 L18.5 9.5 M21 12 L18.5 14.5" />
+    </svg>
+  );
+}
+
 /** 目（自由視点）。 */
 export function IconEye({ size = 16, className }: Props) {
   return (

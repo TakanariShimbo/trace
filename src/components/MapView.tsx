@@ -23,6 +23,9 @@ import {
   IconGrid,
   IconEye,
   IconCaret,
+  IconMove,
+  IconPlus,
+  IconMinus,
 } from "./icons";
 import {
   worldToLonLat,
@@ -148,6 +151,9 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     setMapDimension: (dim: "2d" | "3d", center?: { lon: number; lat: number }, headingDeg?: number) => void;
     setViewCone: (lon: number, lat: number, headingDeg: number, fovDeg: number) => void; // 視野コーン（地形にドレープ）
     hideViewCone: () => void;
+    stageZoom: (factor: number, clientX?: number, clientY?: number) => void; // ④⑤写真ビューのズーム（点指定可）
+    stagePanBy: (dx: number, dy: number) => void; // ④⑤写真ビューのパン（画面px）
+    resetStageView: () => void; // ④⑤写真ビューのズーム/パンを初期化
   } | null>(null);
   // 直近に判明した現在地（起動時＋現在地ボタンで更新）。ホームの基準に使う。
   const homeLocRef = useRef<LonLat | null>(null);
@@ -217,6 +223,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
+  // ④⑤: 写真+3Dビューのズーム率（UI表示・−ボタン無効化用。実体はループ側closure）。
+  const [photoZoom, setPhotoZoom] = useState(1);
+  // ④微調整の操作モード: aim=ドラッグで向き合わせ / move=ドラッグで写真パン。
+  const [arEditMode, setArEditMode] = useState<"aim" | "move">("aim");
+  const arEditModeRef = useRef<"aim" | "move">("aim");
   // --- ライブAR（カメラでその場AR）専用 --- //
   const liveVideoRef = useRef<HTMLVideoElement | null>(null); // 背面カメラのライブ映像
   const liveStreamRef = useRef<MediaStream | null>(null); // 取得中のカメラストリーム（解放用）
@@ -420,11 +431,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       return 0;
     };
 
-    // AR微調整/書き出し中、写真と3Dの「写る範囲」を一致させる枠（CSS px, 左上原点）。
-    // 画面の全高×全幅に写真アスペクトで内接（contain）し、横は中央、縦は基本中央。
-    // ただし下パネルと重なる場合は、上に余白がある分だけ上へ寄せて重なりを避ける
-    // （パネル上に収まらないほど大きい時だけ上端に寄せ＝上部に余白を残さず重なる）。
-    const arStageRect = () => {
+    // 写真+3Dビューの「ユーザー操作による」ズーム(拡大率)とパン(移動量, 画面px)。
+    // 初期配置は基準枠(baseStageRect)＝今までの自動配置。以後はこの2値をユーザーが操作する。
+    let stageScale = 1; // 1=画面内に収まる初期サイズ。>1で拡大（画面より大きくなる）
+    const stagePan = { x: 0, y: 0 }; // 基準中心からの移動量(px)
+    const STAGE_SCALE_MIN = 1;
+    const STAGE_SCALE_MAX = 6;
+
+    // 基準枠（contain）: 縦は中央だが、既定(下)パネルと重なるなら上へ寄せる。
+    // パネルの折り畳み(offsetHeight)には追従するが、ドラッグ移動には追従しない（resting footprint）。
+    const baseStageRect = () => {
       const W = mount.clientWidth;
       const H = mount.clientHeight;
       const aspect = arPhotoAspectRef.current ?? W / Math.max(1, H);
@@ -434,25 +450,62 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         h = H;
         w = h * aspect;
       }
-      let y = (H - h) / 2; // 基本は全高で中央
-      // パネルと重なる場合、パネルの「実際の位置」(ドラッグ移動込み)を見て、
-      // パネルが画面の下半分なら写真を上へ、上半分なら下へ逃がす（重なる側と反対へ）。
-      const hud = arHudRef.current;
-      if (hud) {
-        const pr = hud.getBoundingClientRect(); // transform(ドラッグ)反映済みの実位置
-        const m = mount.getBoundingClientRect();
-        const pTop = pr.top - m.top;
-        const pBottom = pr.bottom - m.top;
-        const gap = 8;
-        if ((pTop + pBottom) / 2 < H / 2) {
-          // パネルが上寄り → 写真は下へ逃げる（上端をパネル下端より下に。収まらなければ下端寄せ）
-          if (y < pBottom + gap) y = Math.min(H - h, pBottom + gap);
-        } else {
-          // パネルが下寄り → 写真は上へ逃げる（下端をパネル上端より上に。収まらなければ上端寄せ）
-          if (y + h > pTop - gap) y = Math.max(0, pTop - gap - h);
-        }
-      }
+      const gap = 8;
+      const panelTop = H - ((arHudRef.current?.offsetHeight ?? 150) + 24 + gap);
+      let y = (H - h) / 2;
+      if (y + h > panelTop) y = Math.max(0, panelTop - h);
       return { x: (W - w) / 2, y, w, h };
+    };
+    // ユーザーのズーム+パンを適用した実枠。画面外に飛ばないよう中心をクランプし、
+    // クランプ結果を stagePan に書き戻す（ドラッグの不感帯を防ぐ）。
+    const arStageRect = () => {
+      const b = baseStageRect();
+      const W = mount.clientWidth;
+      const H = mount.clientHeight;
+      const w = b.w * stageScale;
+      const h = b.h * stageScale;
+      const baseCx = b.x + b.w / 2;
+      const baseCy = b.y + b.h / 2;
+      let cx = baseCx + stagePan.x;
+      let cy = baseCy + stagePan.y;
+      // 中心の可動域: 写真が画面より大きい時は画面を覆う範囲、小さい時は画面内に収まる範囲。
+      const cxLo = Math.min(w / 2, W - w / 2);
+      const cxHi = Math.max(w / 2, W - w / 2);
+      const cyLo = Math.min(h / 2, H - h / 2);
+      const cyHi = Math.max(h / 2, H - h / 2);
+      cx = Math.max(cxLo, Math.min(cxHi, cx));
+      cy = Math.max(cyLo, Math.min(cyHi, cy));
+      stagePan.x = cx - baseCx;
+      stagePan.y = cy - baseCy;
+      return { x: cx - w / 2, y: cy - h / 2, w, h };
+    };
+    // 画面上の点(sx,sy)を固定したままズーム（null=画面中央）。ボタンは中央、ホイール/ピンチはカーソル基準。
+    const stageZoomAt = (factor: number, sx: number | null, sy: number | null) => {
+      const b = baseStageRect();
+      const baseCx = b.x + b.w / 2;
+      const baseCy = b.y + b.h / 2;
+      const s0 = stageScale;
+      const s1 = THREE.MathUtils.clamp(s0 * factor, STAGE_SCALE_MIN, STAGE_SCALE_MAX);
+      if (Math.abs(s1 - s0) < 1e-4) return;
+      const ax = sx ?? mount.clientWidth / 2;
+      const ay = sy ?? mount.clientHeight / 2;
+      const k = s1 / s0;
+      const cx0 = baseCx + stagePan.x;
+      const cy0 = baseCy + stagePan.y;
+      stageScale = s1;
+      stagePan.x = ax + (cx0 - ax) * k - baseCx;
+      stagePan.y = ay + (cy0 - ay) * k - baseCy;
+      setPhotoZoom(s1);
+    };
+    const stagePanBy = (dx: number, dy: number) => {
+      stagePan.x += dx;
+      stagePan.y += dy; // クランプは arStageRect 側で実施
+    };
+    const resetStageView = () => {
+      stageScale = 1;
+      stagePan.x = 0;
+      stagePan.y = 0;
+      setPhotoZoom(1);
     };
     // AR微調整/書き出しで写真枠に合わせて描画するか。
     const isArStage = () =>
@@ -691,6 +744,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       hideViewCone: () => {
         terrain.setViewCone(null);
       },
+      stageZoom: (factor, clientX, clientY) => {
+        if (clientX == null || clientY == null) {
+          stageZoomAt(factor, null, null); // 中央基準（ボタン）
+          return;
+        }
+        const r = renderer.domElement.getBoundingClientRect();
+        stageZoomAt(factor, clientX - r.left, clientY - r.top); // 点基準（ホイール）
+      },
+      stagePanBy: (dx, dy) => stagePanBy(dx, dy),
+      resetStageView: () => resetStageView(),
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
       getPeakSelection: () => {
@@ -737,17 +800,24 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       p.x = e.clientX;
       p.y = e.clientY;
       if (pointers.size >= 2) {
-        // 2本指ピンチ＝画角（シミュレーションのみ）。AR/ライブは撮影時/②で決めた画角を固定。
+        const d = pinchDistance();
         if (appModeRef.current === "simulation") {
-          const d = pinchDistance();
+          // シミュレーション: 2本指ピンチ＝画角。
           if (pinchDist > 0 && d > 0) {
             cam.fov = THREE.MathUtils.clamp(cam.fov * (pinchDist / d), CAM_FOV_MIN, CAM_FOV_MAX);
             setCamFov(cam.fov);
           }
-          pinchDist = d;
+        } else if (arStepRef.current === "align" && pinchDist > 0 && d > 0) {
+          // AR/ライブ④: 画角は固定なので、ピンチは写真+3Dビューのズーム（中点基準）。
+          const pts = [...pointers.values()];
+          stageZoomAt(d / pinchDist, (pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2);
         }
+        pinchDist = d;
+      } else if (appModeRef.current !== "simulation" && arStepRef.current === "align" && arEditModeRef.current === "move") {
+        // AR/ライブ④の「動かす」モード: 1本指ドラッグ＝写真+3Dビューをパン。
+        stagePanBy(dx, dy);
       } else {
-        // 1本指＝向き（ズーム(小fov)ほど感度を下げる）。実際の縦画角(camera.fov)基準。
+        // 1本指＝向き合わせ（ズーム(小fov)ほど感度を下げる）。実際の縦画角(camera.fov)基準。
         const degPerPx = camera.fov / mount.clientHeight;
         cam.heading = (cam.heading - dx * degPerPx + 360) % 360;
         cam.pitch = THREE.MathUtils.clamp(cam.pitch + dy * degPerPx, -CAM_PITCH_LIMIT, CAM_PITCH_LIMIT);
@@ -762,9 +832,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     const onCamWheel = (e: WheelEvent) => {
       if (!cameraMode) return;
       e.preventDefault();
-      if (appModeRef.current !== "simulation") return; // AR/ライブは画角固定（②で変更）
-      cam.fov = THREE.MathUtils.clamp(cam.fov + Math.sign(e.deltaY) * 3, CAM_FOV_MIN, CAM_FOV_MAX);
-      setCamFov(cam.fov);
+      if (appModeRef.current === "simulation") {
+        cam.fov = THREE.MathUtils.clamp(cam.fov + Math.sign(e.deltaY) * 3, CAM_FOV_MIN, CAM_FOV_MAX);
+        setCamFov(cam.fov);
+        return;
+      }
+      // AR/ライブ④: 画角は固定なので、ホイールは写真+3Dビューのズーム（カーソル基準）。
+      if (arStepRef.current === "align") {
+        const rect = renderer.domElement.getBoundingClientRect();
+        stageZoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - rect.left, e.clientY - rect.top);
+      }
     };
     renderer.domElement.addEventListener("pointerdown", onCamDown);
     window.addEventListener("pointermove", onCamMove);
@@ -1105,11 +1182,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   useEffect(() => {
     arStepRef.current = arStep;
   }, [arStep]);
-  // フェーズが変わったら下部パネルは開いて中央へ戻す（畳み/移動はそのフェーズ内だけ）。
+  // 操作モードをループ用 ref に同期。
+  useEffect(() => {
+    arEditModeRef.current = arEditMode;
+  }, [arEditMode]);
+  // フェーズが変わったら下部パネルは開いて中央へ戻し、写真ビュー(ズーム/パン)と操作モードも初期化。
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setArPanelOpen(true);
     setArDockOffset({ x: 0, y: 0 });
+    setArEditMode("aim");
+    apiRef.current?.resetStageView();
   }, [arStep]);
   // arLoc/方位を ref に同期（2D/3D切替の中心・背後角に使う。toggle effectを方位変化で再発火させない）。
   useEffect(() => {
@@ -1605,8 +1688,32 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 仕上げ画面: 名札/点のドラッグ。座標は写真枠内の正規化値(0..1)で持つ。
   const onEditDown = (i: number, kind: "dot" | "label") => (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // 名札/点のドラッグは写真パンを開始させない
     (e.target as Element).setPointerCapture?.(e.pointerId);
     arDragRef.current = { i, kind };
+  };
+  // 仕上げ画面: 写真の余白部分をドラッグ＝写真+3Dビューをパン（名札以外の場所）。
+  const onStagePanDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest(".ar-edit-label, .ar-edit-dot")) return;
+    let px = e.clientX;
+    let py = e.clientY;
+    const move = (ev: PointerEvent) => {
+      apiRef.current?.stagePanBy(ev.clientX - px, ev.clientY - py);
+      px = ev.clientX;
+      py = ev.clientY;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+  // 仕上げ画面: ホイールで写真+3Dビューをズーム（カーソル基準）。
+  const onStageWheel = (e: React.WheelEvent) => {
+    apiRef.current?.stageZoom(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX, e.clientY);
   };
   const onEditMove = (e: React.PointerEvent) => {
     const d = arDragRef.current;
@@ -1764,6 +1871,46 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         })}
       </div>
     ) : null;
+
+  // ④⑤共通: 写真+3Dビューのズーム（＋/−）。％表示。−は等倍で無効。
+  const stageZoomControls = (
+    <div className="stage-zoom">
+      <button
+        className="stage-zoom-btn"
+        title="縮小"
+        aria-label="縮小"
+        disabled={photoZoom <= 1.001}
+        onClick={() => apiRef.current?.stageZoom(1 / 1.25)}
+      >
+        <IconMinus size={16} />
+      </button>
+      <span className="stage-zoom-val">{Math.round(photoZoom * 100)}%</span>
+      <button className="stage-zoom-btn" title="拡大" aria-label="拡大" onClick={() => apiRef.current?.stageZoom(1.25)}>
+        <IconPlus size={16} />
+      </button>
+    </div>
+  );
+  // ④のみ: ドラッグの役割を切替（合わせる=向き / 動かす=写真パン）。
+  const editModeToggle = (
+    <div className="edit-mode-toggle" role="group" aria-label="操作モード">
+      <button
+        className={`emt-btn${arEditMode === "aim" ? " is-on" : ""}`}
+        title="合わせる（ドラッグで向き合わせ）"
+        onClick={() => setArEditMode("aim")}
+      >
+        <IconLocate size={15} />
+        合わせる
+      </button>
+      <button
+        className={`emt-btn${arEditMode === "move" ? " is-on" : ""}`}
+        title="動かす（ドラッグで写真を移動）"
+        onClick={() => setArEditMode("move")}
+      >
+        <IconMove size={15} />
+        動かす
+      </button>
+    </div>
+  );
 
   return (
     <div className="mapview">
@@ -1987,7 +2134,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           パネルは①〜④と同じ統一シェル（グリップ＝ステップ＋折り畳み、本体＝ヒント＋操作）。 */}
       {appMode === "ar" && arStep === "export" && (
         <div className="ar-edit">
-          <div className="ar-edit-stage" ref={arEditStageRef}>
+          <div
+            className="ar-edit-stage"
+            ref={arEditStageRef}
+            onPointerDown={onStagePanDown}
+            onWheel={onStageWheel}
+          >
             {photoUrl && <img className="ar-edit-photo" src={photoUrl} alt="" draggable={false} />}
             {/* 引き出し線（名札→点） */}
             <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -2046,9 +2198,10 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </div>
             {arPanelOpen && (
               <>
+                <div className="stage-controls">{stageZoomControls}</div>
                 <span className="cam-hint">
                   {arLabels.length > 0
-                    ? `名札や点をドラッグで位置を微調整（${arLabels.length}件）`
+                    ? `名札や点をドラッグで位置を微調整／余白ドラッグで移動（${arLabels.length}件）`
                     : "写真の枠内に山がありません。微調整で向きを合わせ直してください"}
                 </span>
                 <div className="ar-dock-actions">
@@ -2193,6 +2346,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {arPanelOpen && (
           <>
+          {appMode !== "simulation" && arStep === "align" && (
+            <div className="stage-controls">
+              {editModeToggle}
+              {stageZoomControls}
+            </div>
+          )}
           <div className="cam-readout">
             <span>方位 {compass(camHeading)} {Math.round(camHeading)}°</span>
             <span>仰角 {Math.round(camPitch)}°</span>

@@ -20,6 +20,7 @@ body,
 .mapview {
   position: fixed;
   inset: 0;
+  overflow: hidden; /* ④⑤で写真を拡大した時、画面外へはみ出す分をクリップ */
 }
 
 .mapview-canvas {
@@ -183,6 +184,67 @@ body,
   gap: 10px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+/* ④⑤: 操作モード切替＋ズーム の行 */
+.stage-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.edit-mode-toggle {
+  display: inline-flex;
+  background: rgba(40, 52, 68, 0.5);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 9px;
+  padding: 2px;
+  gap: 2px;
+}
+.emt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b9c6d8;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.emt-btn.is-on {
+  color: #fff;
+  background: rgba(56, 120, 200, 0.85);
+}
+.stage-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stage-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  color: #cdd6e2;
+  background: rgba(40, 52, 68, 0.55);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.stage-zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.stage-zoom-val {
+  min-width: 42px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #aebccf;
 }
 .cam-eye {
   display: flex;
@@ -1243,7 +1305,9 @@ body,
   position: absolute;
   inset: 0;
   background: #06080c;
+  overflow: hidden; /* 拡大した編集ステージのはみ出しをクリップ */
   z-index: 22;
+  touch-action: none; /* 余白ドラッグでパン（スクロールさせない） */
 }
 /* 編集ステージは微調整(④)と同じ枠(arStageRect)に合わせるため、left/top/width/height は
    render loop が px で設定する（CSSでのサイズ指定はしない）。 */
