@@ -2314,6 +2314,84 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       </div>
       {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
 
+      {/* 検索＋地図(ベースマップ)を画面上に常駐（地図が見えている時）。サイドバーは表示トグルのみ。 */}
+      {mode === "map" && !(arLike && arStep === "upload") && (
+        <div className="map-tools">
+          <div className="map-search">
+            <div className="search-modes">
+              {SEARCH_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  className={m.id === searchMode ? "is-active" : ""}
+                  onClick={() => changeMode(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+            <form className="search-bar" onSubmit={doSearch}>
+              <input
+                type="search"
+                value={query}
+                placeholder={
+                  searchMode === "mountain"
+                    ? "山名で検索（例: 槍ヶ岳）"
+                    : searchMode === "place"
+                      ? "地名で検索（例: 上高地）"
+                      : "山名・地名で検索（例: 富士山）"
+                }
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <button type="submit" title="検索" aria-label="検索" disabled={searching}>
+                {searching ? (
+                  <span className="spinner" aria-hidden="true" />
+                ) : (
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="10.5" cy="10.5" r="6.5" />
+                    <line x1="15.5" y1="15.5" x2="21" y2="21" />
+                  </svg>
+                )}
+              </button>
+            </form>
+            {results.length > 0 && (
+              <ul className="search-results">
+                {results.map((r, i) => (
+                  <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
+                    <button onClick={() => goToResult(r)}>
+                      <span className="res-ico">
+                        {r.kind === "mountain" ? <IconMountain size={15} /> : <IconPin size={15} />}
+                      </span>
+                      <span className="res-title">{r.title}</span>
+                      {r.kind === "mountain" && (
+                        <span className="res-sub">
+                          {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="basemap-switch map-tools-basemap">
+            {BASEMAPS.map((b) => (
+              <button key={b.id} className={b.id === basemapId ? "is-active" : ""} onClick={() => setBasemapId(b.id)}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
       <button className="home-btn" title="ホーム画面へ戻る" aria-label="ホーム" onClick={onHome}>
         <IconHome size={18} />
@@ -2699,92 +2777,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <span>GSI 3D Map</span>
           <button className="sidebar-close" title="閉じる" onClick={() => setSidebarOpen(false)}>×</button>
         </div>
-
-        {/* 検索 */}
-        <section className={secClass("search")}>
-          {secHead("search", "検索")}
-          <div className="search-modes">
-            {SEARCH_MODES.map((m) => (
-              <button
-                key={m.id}
-                className={m.id === searchMode ? "is-active" : ""}
-                onClick={() => changeMode(m.id)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <form className="search-bar" onSubmit={doSearch}>
-            <input
-              type="search"
-              value={query}
-              placeholder={
-                searchMode === "mountain"
-                  ? "山名で検索（例: 槍ヶ岳）"
-                  : searchMode === "place"
-                    ? "地名で検索（例: 上高地）"
-                    : "山名・地名で検索（例: 富士山）"
-              }
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <button type="submit" title="検索" aria-label="検索" disabled={searching}>
-              {searching ? (
-                <span className="spinner" aria-hidden="true" />
-              ) : (
-                <svg
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  aria-hidden="true"
-                >
-                  <circle cx="10.5" cy="10.5" r="6.5" />
-                  <line x1="15.5" y1="15.5" x2="21" y2="21" />
-                </svg>
-              )}
-            </button>
-          </form>
-
-          {/* 現在地へ移動は画面左上のアイコンボタンに出している（サイドバー外） */}
-          {results.length > 0 && (
-            <ul className="search-results">
-              {results.map((r, i) => (
-                <li key={`${r.kind},${r.lat},${r.lon},${i}`}>
-                  <button onClick={() => goToResult(r)}>
-                    <span className="res-ico">
-                      {r.kind === "mountain" ? <IconMountain size={15} /> : <IconPin size={15} />}
-                    </span>
-                    <span className="res-title">{r.title}</span>
-                    {r.kind === "mountain" && (
-                      <span className="res-sub">
-                        {r.elevationM}m{r.sub ? ` ・ ${r.sub}` : ""}
-                      </span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* 地図（ベースマップ） */}
-        <section className={secClass("map")}>
-          {secHead("map", "地図")}
-          <div className="basemap-switch">
-            {BASEMAPS.map((b) => (
-              <button
-                key={b.id}
-                className={b.id === basemapId ? "is-active" : ""}
-                onClick={() => setBasemapId(b.id)}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-        </section>
 
         {/* 表示 */}
         <section className={secClass("view")}>

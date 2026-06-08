@@ -130,6 +130,37 @@ body,
   gap: 8px;
   z-index: 23; /* 出力(仕上げ)の全画面オーバーレイ(z22)でも常に押せるように */
 }
+/* 検索＋ベースマップを画面上に常駐（topbarアイコンの下・左寄せ）。サイドバーは表示トグルのみ。 */
+.map-tools {
+  position: absolute;
+  top: calc(max(8px, env(safe-area-inset-top, 8px)) + 44px);
+  left: max(8px, env(safe-area-inset-left, 8px));
+  width: min(340px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 19; /* キャンバス上・下部パネル(z20)より下 */
+}
+.map-tools .search-modes,
+.map-tools .search-bar {
+  margin-bottom: 0;
+}
+.map-tools .search-results {
+  max-height: 44vh;
+}
+.basemap-switch.map-tools-basemap {
+  grid-template-columns: repeat(4, 1fr);
+  background: rgba(14, 19, 27, 0.85);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 9px;
+  padding: 3px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.map-tools-basemap button {
+  padding: 6px 4px;
+  font-size: 12px;
+}
 .topbar-btn {
   display: inline-flex;
   align-items: center;
