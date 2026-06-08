@@ -298,12 +298,47 @@ body,
   font-weight: 600;
   font-size: 13px;
 }
+/* カメラHUDの読み取り（方位/仰角/横画角）をスタットカード風に。 */
 .cam-readout {
   display: flex;
-  justify-content: space-around;
-  gap: 10px;
-  font-size: 13px;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(130, 150, 175, 0.16);
+  border-bottom: 1px solid rgba(130, 150, 175, 0.16);
+}
+.cam-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.cam-stat > span {
+  font-size: 10px;
+  color: #8fa2bb;
+}
+.cam-stat > b {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e6edf5;
   font-variant-numeric: tabular-nums;
+}
+/* スライダー行: ラベル左＋値右、向き補足は小さく。 */
+.cam-eye-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.cam-eye-head > b {
+  font-weight: 700;
+  color: #e6edf5;
+  font-variant-numeric: tabular-nums;
+}
+.cam-eye-sub {
+  font-style: normal;
+  font-size: 10px;
+  color: #8fa2bb;
 }
 /* ④⑤: 操作モード切替＋ズーム の行 */
 .stage-controls {

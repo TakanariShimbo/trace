@@ -2172,6 +2172,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     </>
   );
 
+  // カメラHUDのスライダー行（ラベル左＋値右、必要なら向きの補足）。
+  const camSlider = (label: React.ReactNode, value: React.ReactNode, input: React.ReactNode) => (
+    <label className="cam-eye">
+      <span className="cam-eye-head">
+        <span>{label}</span>
+        <b>{value}</b>
+      </span>
+      {input}
+    </label>
+  );
+
   return (
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
@@ -2570,48 +2581,42 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </div>
           )}
           <div className="cam-readout">
-            <span>方位 {compass(camHeading)} {Math.round(camHeading)}°</span>
-            <span>仰角 {Math.round(camPitch)}°</span>
-            <span>横画角 {Math.round(camFov)}°</span>
+            <div className="cam-stat">
+              <span>方位</span>
+              <b>{compass(camHeading)} {Math.round(camHeading)}°</b>
+            </div>
+            <div className="cam-stat">
+              <span>仰角</span>
+              <b>{Math.round(camPitch)}°</b>
+            </div>
+            <div className="cam-stat">
+              <span>横画角</span>
+              <b>{Math.round(camFov)}°</b>
+            </div>
           </div>
-          <label className="cam-eye">
-            <span>目線高さ {camEyeHeight} m</span>
-            <input
-              type="range"
-              min={-200}
-              max={200}
-              value={camEyeHeight}
-              onChange={(e) => changeCamEyeHeight(Number(e.target.value))}
-            />
-          </label>
+          {camSlider(
+            "目線高さ",
+            `${camEyeHeight} m`,
+            <input type="range" min={-200} max={200} value={camEyeHeight} onChange={(e) => changeCamEyeHeight(Number(e.target.value))} />,
+          )}
           {/* 横画角スライダー（シミュレーションのみ）。AR/ライブは撮影時/②で決めた画角を固定。 */}
-          {simView && (
-            <label className="cam-eye">
-              <span>横画角 {Math.round(camFov)}°（望遠 ←→ 広角）</span>
-              <input
-                type="range"
-                min={CAM_FOV_MIN}
-                max={CAM_FOV_MAX}
-                value={Math.round(camFov)}
-                onChange={(e) => changeCamFov(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {/* 水平の傾き（ロール）補正。向きは変えずビュー軸まわりに回すだけ。
-              ライブ（カメラAR）は端末を傾けて合わせられるので不要 → 非表示。写真 AR とシミュでは出す。 */}
-          {appMode !== "live" && (
-            <label className="cam-eye">
-              <span>水平の傾き {camRoll}°（左 ←→ 右）</span>
-              <input
-                type="range"
-                min={-45}
-                max={45}
-                step={0.5}
-                value={camRoll}
-                onChange={(e) => changeCamRoll(Number(e.target.value))}
-              />
-            </label>
-          )}
+          {simView &&
+            camSlider(
+              <>
+                横画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+              </>,
+              `${Math.round(camFov)}°`,
+              <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(camFov)} onChange={(e) => changeCamFov(Number(e.target.value))} />,
+            )}
+          {/* 水平の傾き（ロール）補正。ライブは端末を傾けて合わせられるので非表示。 */}
+          {appMode !== "live" &&
+            camSlider(
+              <>
+                水平の傾き <i className="cam-eye-sub">左 ←→ 右</i>
+              </>,
+              `${camRoll}°`,
+              <input type="range" min={-45} max={45} step={0.5} value={camRoll} onChange={(e) => changeCamRoll(Number(e.target.value))} />,
+            )}
           {/* 写真オーバーレイ操作（ARモードのみ）: 未読込なら取り込み、読込済みなら不透明度＋解除 */}
           {appMode === "ar" && (
             <div className="cam-photo">
