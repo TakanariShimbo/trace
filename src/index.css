@@ -752,9 +752,11 @@ body,
 /* 月相サイクル帯（新月→満月→新月で今どこかを示す） */
 .moon-cycle {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 4px;
+  /* 月アイコンの真下は空けて、月の情報テキスト（アイコン幅24＋gap10）と頭を揃える。 */
+  padding-left: 34px;
 }
 .moon-cyc {
   display: flex;
