@@ -464,18 +464,6 @@ body,
 .cam-photo-pick:hover {
   background: rgba(79, 134, 198, 0.34);
 }
-.cam-photo-opacity {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  font-size: 12px;
-  color: #cdd6e2;
-}
-.cam-photo-opacity input[type="range"] {
-  width: 100%;
-  accent-color: #4f86c6;
-}
 
 /* ホームへ戻る（左上・メニューの右） */
 /* GPS失敗時の注意（上部バーの下に出す） */
@@ -1419,16 +1407,6 @@ body,
   line-height: 1.6;
   color: #aebccf;
 }
-.ar-fov {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-}
-.ar-fov input[type="range"] {
-  width: 100%;
-  accent-color: #4f86c6;
-}
 
 /* ARフェーズのフッター（カメラHUD内：向き合わせ／山選択） */
 .ar-phase-foot {
@@ -1574,14 +1552,6 @@ body,
   font-weight: 700;
 }
 /* 向き・画角の読み値 */
-.ar-readout {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: #cdd6e2;
-}
 
 /* ライブAR ②: 方位センサ追従のON/OFFトグル */
 .ar-follow-toggle {
