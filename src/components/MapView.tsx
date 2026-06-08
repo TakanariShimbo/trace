@@ -29,6 +29,7 @@ import {
   IconMinus,
   IconSearch,
   IconCompass,
+  IconInfo,
 } from "./icons";
 import {
   worldToLonLat,
@@ -2205,7 +2206,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     ? "日時を変えると、その地点から見た太陽・月の方位・高度が変わります。"
     : isOffline
       ? "保存したい範囲を画面中央に合わせて、下の「ダウンロード」で保存します。"
-      : "地図をドラッグ・検索で移動。「カメラ」で立つと一人称で見回せます。";
+      : "地図をドラッグ／検索で移動します。「カメラ」で立つと一人称で見回せます。";
+  // アナウンス（タイトル直下の案内）。全モード共通の体裁：先頭にアナウンスアイコン＋本文。
+  const announce = (text: React.ReactNode) => (
+    <div className="dock-hint">
+      <IconInfo size={13} className="dock-hint-ico" />
+      <span>{text}</span>
+    </div>
+  );
   // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
   const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
     const open = dockSecOpen[id] ?? true;
@@ -2353,29 +2361,26 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {arPanelOpen && (
             <div className="ar-dock-body">
               {/* アナウンス（タイトル直下） */}
-              <div className="ar-hint">
-                {arStep === "select" ? <IconMountain size={15} /> : <IconPin size={15} />}
-                <span>
-                  {arStep === "locate"
+              {announce(
+                arStep === "locate"
+                  ? appMode === "live"
+                    ? liveStatus ??
+                      (arLoc
+                        ? "現在地を表示しています。この位置で合っていますか？ ずれていれば地図をタップして調整できます。"
+                        : "現在地を取得しています…。地図をタップして指定もできます。")
+                    : arLoc
+                      ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます。"
+                      : "撮影地点を選んでください。地図をタップ、または下の検索で指定します。"
+                  : arStep === "params"
                     ? appMode === "live"
-                      ? liveStatus ??
-                        (arLoc
-                          ? "現在地です。この位置で合っていますか？ ずれていれば地図をタップして調整できます"
-                          : "現在地を取得しています…（地図をタップして指定もできます）")
-                      : arLoc
-                        ? "この位置でよろしいですか？ ずれていれば地図をタップ／検索で調整できます"
-                        : "撮影地点を選んでください — 地図をタップ、または下の検索で指定"
-                    : arStep === "params"
-                      ? appMode === "live"
-                        ? liveFollow
-                          ? `スマホを地面と水平にして見たい方へ向けてください（方位センサで追従${
-                              liveCompassDeg == null ? "／取得待ち…" : "中"
-                            }）。地図タップ or 下のボタンで固定して微調整できます。`
-                          : "固定中です。地図をタップして向きを微調整、または下のボタンで方位センサに戻せます。スライダーで画角を調整。"
-                        : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整。"
-                      : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に移動・拡大できます（上の「${appMode === "live" ? "現在地" : "撮影地点"}に戻る」で復帰）`}
-                </span>
-              </div>
+                      ? liveFollow
+                        ? `スマホを地面と水平にして、見たい方へ向けてください（方位センサで追従${
+                            liveCompassDeg == null ? "／取得待ち…" : "中"
+                          }）。地図タップ／下のボタンで固定して微調整できます。`
+                        : "固定中です。地図をタップして向きを微調整、または下のボタンで方位センサに戻せます。スライダーで画角を調整します。"
+                      : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整します。"
+                    : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に移動・拡大できます（上の「${appMode === "live" ? "現在地" : "撮影地点"}に戻る」で復帰）。`,
+              )}
               {/* 操作（現在地・3D/2D・撮影地点へ） */}
               {dockControls}
               {/* 内容 */}
@@ -2544,11 +2549,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             </div>
             {arPanelOpen && (
               <>
-                <div className="dock-hint">
-                  {arLabels.length > 0
-                    ? `名札や点をドラッグで位置を微調整／余白ドラッグで移動（${arLabels.length}件）`
-                    : "写真の枠内に山がありません。微調整で向きを合わせ直してください"}
-                </div>
+                {announce(
+                  arLabels.length > 0
+                    ? `名札や点をドラッグで微調整します。余白のドラッグで全体を移動できます（${arLabels.length}件）。`
+                    : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
+                )}
                 <div className="stage-controls">{stageZoomControls}</div>
                 <div className="ar-dock-actions">
                   <button
@@ -2637,18 +2642,15 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {arPanelOpen && (
           <>
           {/* アナウンス（タイトル直下） */}
-          {simView ? (
-            <div className="dock-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
-          ) : arStep === "align" ? (
-            <div className="ar-hint">
-              <IconMountain size={15} />
-              <span>
-                {appMode === "live"
-                  ? "選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。"
-                  : "選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。"}
-              </span>
-            </div>
-          ) : null}
+          {simView
+            ? announce("ドラッグで見回します。ホイール／ピンチで画角を変えられます。")
+            : arStep === "align"
+              ? announce(
+                  appMode === "live"
+                    ? "選んだ山名がカメラ映像に重なります。ドラッグで向き、スライダーで目線高さを合わせて確認します。"
+                    : "選んだ山名が写真に重なります。ドラッグで向き、スライダーで目線高さ／傾きを合わせ込みます。",
+                )
+              : null}
           {/* 操作（3D/2D・地図/カメラ 等） */}
           {dockControls}
           {/* 内容 */}
@@ -2767,7 +2769,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {modePanelOpen && (
             <div className="mode-dock-body">
-              <div className="dock-hint">{modeHint}</div>
+              {announce(modeHint)}
               {dockControls}
               {dockSection("search", <><IconSearch size={13} /> 検索</>, searchPanel)}
               {dockSection("basemap", <><IconMap size={13} /> 地図</>, basemapPanel)}

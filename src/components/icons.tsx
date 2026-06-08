@@ -269,6 +269,17 @@ export function IconEye({ size = 16, className }: Props) {
   );
 }
 
+/** インフォ（i）。アナウンス（案内文）の先頭マーク用。 */
+export function IconInfo({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16.5" />
+      <circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 /** 虫めがね（検索）。検索セクションの見出し用。 */
 export function IconSearch({ size = 16, className }: Props) {
   return (
