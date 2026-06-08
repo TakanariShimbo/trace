@@ -220,6 +220,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
   const arPinXZRef = useRef<{ x: number; z: number } | null>(null); // 撮影地点ピンのワールドXZ
   const [modePanelOpen, setModePanelOpen] = useState(true); // celestial/offline の専用パネルの折り畳み
+  const [dockSecOpen, setDockSecOpen] = useState<Record<string, boolean>>({}); // ドック内セクションの開閉（既定=開）
   const arPinElRef = useRef<HTMLDivElement | null>(null); // 撮影地点ピンのDOM（先端を地表に接地）
   const arPhotoAspectRef = useRef<number | null>(null); // 撮影写真の縦横比(W/H)。3D枠の整形に使う
   const arPhotoElRef = useRef<HTMLImageElement | null>(null); // 写真オーバーレイのDOM（枠に追従）
@@ -2182,6 +2183,60 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {input}
     </label>
   );
+  // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
+  const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
+    const open = dockSecOpen[id] ?? true;
+    return (
+      <div className="dock-section">
+        <button
+          type="button"
+          className="dock-section-head"
+          aria-expanded={open}
+          onClick={() => setDockSecOpen((s) => ({ ...s, [id]: !(s[id] ?? true) }))}
+        >
+          <span className="dock-section-label">{label}</span>
+          <IconCaret dir={open ? "up" : "down"} size={12} />
+        </button>
+        {open && content}
+      </div>
+    );
+  };
+  // カメラ視点の読み取り・スライダー（地形/天体のカメラビューと AR で使い回す）。
+  const cameraReadout = (
+    <div className="cam-readout">
+      <div className="cam-stat">
+        <span>方位</span>
+        <b>{compass(camHeading)} {Math.round(camHeading)}°</b>
+      </div>
+      <div className="cam-stat">
+        <span>仰角</span>
+        <b>{Math.round(camPitch)}°</b>
+      </div>
+      <div className="cam-stat">
+        <span>横画角</span>
+        <b>{Math.round(camFov)}°</b>
+      </div>
+    </div>
+  );
+  const eyeSlider = camSlider(
+    "目線高さ",
+    `${camEyeHeight} m`,
+    <input type="range" min={-200} max={200} value={camEyeHeight} onChange={(e) => changeCamEyeHeight(Number(e.target.value))} />,
+  );
+  const fovSlider = camSlider(
+    <>
+      横画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+    </>,
+    `${Math.round(camFov)}°`,
+    <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(camFov)} onChange={(e) => changeCamFov(Number(e.target.value))} />,
+  );
+  const rollSlider = camSlider(
+    <>
+      水平の傾き <i className="cam-eye-sub">左 ←→ 右</i>
+    </>,
+    `${camRoll}°`,
+    <input type="range" min={-45} max={45} step={0.5} value={camRoll} onChange={(e) => changeCamRoll(Number(e.target.value))} />,
+  );
 
   return (
     <div className="mapview">
@@ -2574,136 +2629,120 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {arPanelOpen && (
           <>
           {dockControls}
-          {arLike && arStep === "align" && (
-            <div className="stage-controls">
-              {editModeToggle}
-              {stageZoomControls}
-            </div>
-          )}
-          <div className="cam-readout">
-            <div className="cam-stat">
-              <span>方位</span>
-              <b>{compass(camHeading)} {Math.round(camHeading)}°</b>
-            </div>
-            <div className="cam-stat">
-              <span>仰角</span>
-              <b>{Math.round(camPitch)}°</b>
-            </div>
-            <div className="cam-stat">
-              <span>横画角</span>
-              <b>{Math.round(camFov)}°</b>
-            </div>
-          </div>
-          {camSlider(
-            "目線高さ",
-            `${camEyeHeight} m`,
-            <input type="range" min={-200} max={200} value={camEyeHeight} onChange={(e) => changeCamEyeHeight(Number(e.target.value))} />,
-          )}
-          {/* 横画角スライダー（シミュレーションのみ）。AR/ライブは撮影時/②で決めた画角を固定。 */}
-          {simView &&
-            camSlider(
-              <>
-                横画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
-              </>,
-              `${Math.round(camFov)}°`,
-              <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(camFov)} onChange={(e) => changeCamFov(Number(e.target.value))} />,
-            )}
-          {/* 水平の傾き（ロール）補正。ライブは端末を傾けて合わせられるので非表示。 */}
-          {appMode !== "live" &&
-            camSlider(
-              <>
-                水平の傾き <i className="cam-eye-sub">左 ←→ 右</i>
-              </>,
-              `${camRoll}°`,
-              <input type="range" min={-45} max={45} step={0.5} value={camRoll} onChange={(e) => changeCamRoll(Number(e.target.value))} />,
-            )}
-          {/* 写真オーバーレイ操作（ARモードのみ）: 未読込なら取り込み、読込済みなら不透明度＋解除 */}
-          {appMode === "ar" && (
-            <div className="cam-photo">
-              {!photoUrl ? (
-                <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
-                  <IconImage size={15} />
-                  <span>写真を重ねて合わせる</span>
-                </button>
-              ) : (
-                <label className="cam-photo-opacity">
-                  <span>写真の濃さ {Math.round(photoOpacity * 100)}%（シミュレーション ←→ 写真）</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round(photoOpacity * 100)}
-                    onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
-                  />
-                </label>
+          {simView ? (
+            <>
+              {dockSection(
+                "camcfg",
+                "カメラ設定",
+                <>
+                  {cameraReadout}
+                  {eyeSlider}
+                  {fovSlider}
+                  {rollSlider}
+                  <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
+                </>,
               )}
-            </div>
-          )}
-          {/* ライブAR: カメラ映像の不透明度（3Dと重ねて山位置を確認） */}
-          {appMode === "live" && (
-            <div className="cam-photo">
-              <label className="cam-photo-opacity">
-                <span>カメラ映像の濃さ {Math.round(photoOpacity * 100)}%（シミュレーション ←→ カメラ）</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(photoOpacity * 100)}
-                  onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
-                />
-              </label>
-            </div>
-          )}
-          {/* シミュレーションの操作ヒント */}
-          {simView && (
-            <div className="cam-hint">ドラッグで見回す ／ ホイール・ピンチで画角</div>
-          )}
-          {/* AR ④微調整: 選んだ山名を写真に重ねて見ながら合わせ込む */}
-          {appMode === "ar" && arStep === "align" && (
-            <div className="ar-phase-foot">
-              <span className="cam-hint">
-                選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。
-              </span>
-              <div className="ar-dock-actions">
-                <button
-                  className="ar-btn-sub ar-btn--icon"
-                  title="山選択へ戻る"
-                  aria-label="山選択へ戻る"
-                  onClick={backToSelect}
-                >
-                  <IconChevron dir="left" size={18} />
-                </button>
-                <button
-                  className="ar-btn-main ar-btn--icon"
-                  title="仕上げ（次へ）"
-                  aria-label="仕上げ（次へ）"
-                  onClick={goExport}
-                >
-                  <IconChevron dir="right" size={18} />
-                </button>
-              </div>
-            </div>
-          )}
-          {/* ライブAR 確認: いま見えている山と、選んだ山が合っているか確認・微調整（書き出しなし） */}
-          {appMode === "live" && arStep === "align" && (
-            <div className="ar-phase-foot">
-              <span className="cam-hint">
-                選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。
-              </span>
-              <div className="ar-dock-actions">
-                <button
-                  className="ar-btn-sub ar-btn--icon"
-                  title="山選択へ戻る"
-                  aria-label="山選択へ戻る"
-                  onClick={backToSelect}
-                >
-                  <IconChevron dir="left" size={18} />
-                </button>
-                <button className="ar-btn-main" onClick={onHome}>
-                  完了
-                </button>
-              </div>
-            </div>
+              {showCelestial &&
+                dockSection(
+                  "celest",
+                  <>
+                    <IconSun size={13} /> 太陽・月
+                  </>,
+                  celestialControls,
+                )}
+            </>
+          ) : (
+            <>
+              {arLike && arStep === "align" && (
+                <div className="stage-controls">
+                  {editModeToggle}
+                  {stageZoomControls}
+                </div>
+              )}
+              {cameraReadout}
+              {eyeSlider}
+              {appMode !== "live" && rollSlider}
+              {appMode === "ar" && (
+                <div className="cam-photo">
+                  {!photoUrl ? (
+                    <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
+                      <IconImage size={15} />
+                      <span>写真を重ねて合わせる</span>
+                    </button>
+                  ) : (
+                    <label className="cam-photo-opacity">
+                      <span>写真の濃さ {Math.round(photoOpacity * 100)}%（シミュレーション ←→ 写真）</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={Math.round(photoOpacity * 100)}
+                        onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
+              {appMode === "live" && (
+                <div className="cam-photo">
+                  <label className="cam-photo-opacity">
+                    <span>カメラ映像の濃さ {Math.round(photoOpacity * 100)}%（シミュレーション ←→ カメラ）</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round(photoOpacity * 100)}
+                      onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)}
+                    />
+                  </label>
+                </div>
+              )}
+              {appMode === "ar" && arStep === "align" && (
+                <div className="ar-phase-foot">
+                  <span className="cam-hint">
+                    選んだ山名が写真に重なります。ドラッグで向き・スライダーで目線高さ/傾きを合わせ込む。
+                  </span>
+                  <div className="ar-dock-actions">
+                    <button
+                      className="ar-btn-sub ar-btn--icon"
+                      title="山選択へ戻る"
+                      aria-label="山選択へ戻る"
+                      onClick={backToSelect}
+                    >
+                      <IconChevron dir="left" size={18} />
+                    </button>
+                    <button
+                      className="ar-btn-main ar-btn--icon"
+                      title="仕上げ（次へ）"
+                      aria-label="仕上げ（次へ）"
+                      onClick={goExport}
+                    >
+                      <IconChevron dir="right" size={18} />
+                    </button>
+                  </div>
+                </div>
+              )}
+              {appMode === "live" && arStep === "align" && (
+                <div className="ar-phase-foot">
+                  <span className="cam-hint">
+                    選んだ山名がカメラ映像に重なります。ドラッグで向き・スライダーで目線高さを合わせて確認。
+                  </span>
+                  <div className="ar-dock-actions">
+                    <button
+                      className="ar-btn-sub ar-btn--icon"
+                      title="山選択へ戻る"
+                      aria-label="山選択へ戻る"
+                      onClick={backToSelect}
+                    >
+                      <IconChevron dir="left" size={18} />
+                    </button>
+                    <button className="ar-btn-main" onClick={onHome}>
+                      完了
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           </>
           )}
@@ -2744,26 +2783,17 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           {modePanelOpen && (
             <div className="mode-dock-body">
               {dockControls}
-              <div className="dock-section">
-                <div className="dock-section-label">検索</div>
-                {searchPanel}
-              </div>
-              <div className="dock-section">
-                <div className="dock-section-label">地図</div>
-                {basemapPanel}
-              </div>
-              {showCelestial && (
-                <div className="dock-section">
-                  <div className="dock-section-label">太陽・月</div>
-                  {celestialControls}
-                </div>
-              )}
-              {isOffline && (
-                <div className="dock-section">
-                  <div className="dock-section-label">オフライン保存</div>
-                  {offlineControls}
-                </div>
-              )}
+              {dockSection("search", "検索", searchPanel)}
+              {dockSection("basemap", "地図", basemapPanel)}
+              {showCelestial &&
+                dockSection(
+                  "celest",
+                  <>
+                    <IconSun size={13} /> 太陽・月
+                  </>,
+                  celestialControls,
+                )}
+              {isOffline && dockSection("save", "オフライン保存", offlineControls)}
             </div>
           )}
         </div>

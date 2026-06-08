@@ -290,6 +290,24 @@ body,
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #8fa2bb;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+/* 折りたたみ用の見出しボタン（クリックで開閉）。 */
+.dock-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.dock-section-head > svg {
+  color: #8fa2bb;
+  flex: none;
 }
 /* モードドックのグリップ内タイトル（太陽/保存/地図 のラベル）。 */
 .mode-panel-title {
