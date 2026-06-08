@@ -223,6 +223,17 @@ body,
   -webkit-backdrop-filter: blur(8px);
   z-index: 20; /* 写真オーバーレイ(z4)より前面に */
 }
+/* ドック内の操作ボタン群（現在地/カメラ/2D3D/自由視点/撮影地点に戻る）。 */
+.dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* グリップ内では右寄せ（折りたたみトグルの直前）。 */
+.cam-hud-grip .dock-controls,
+.ar-panel-grip .dock-controls {
+  margin-left: auto;
+}
 /* モードドックのグリップ内タイトル（太陽/保存/地図 のラベル）。 */
 .mode-panel-title {
   display: inline-flex;

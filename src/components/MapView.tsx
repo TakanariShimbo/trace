@@ -1914,6 +1914,63 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     </div>
   );
 
+  // 各ドックの操作ボタン群（現在地/カメラ/2D3D/自由視点/撮影地点に戻る）。出し分けは各自で gate。
+  const dockControls = (
+    <div className="dock-controls">
+      {mode === "map" && (
+        <button
+          className="topbar-btn"
+          title="現在地へ移動"
+          aria-label="現在地へ移動"
+          onClick={goToCurrentLocation}
+          disabled={locating}
+        >
+          {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
+        </button>
+      )}
+      {simView && (
+        <button
+          className={`topbar-btn${mode === "camera" ? " is-active" : ""}`}
+          title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
+          aria-label={mode === "map" ? "カメラ視点" : "地図に戻る"}
+          onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
+        >
+          {mode === "map" ? <IconCamera size={18} /> : <IconMap size={18} />}
+        </button>
+      )}
+      {mode === "map" && (
+        <button
+          className="topbar-btn"
+          title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
+          aria-label={map2D ? "3D表示に切り替え" : "2D表示に切り替え"}
+          onClick={() => setMap2D((v) => !v)}
+        >
+          {map2D ? <IconCube size={18} /> : <IconGrid size={18} />}
+        </button>
+      )}
+      {showCelestial && mode === "map" && (
+        <button
+          className={`topbar-btn${freeLook ? " is-active" : ""}`}
+          title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす"
+          aria-label="自由視点"
+          onClick={toggleFreeLook}
+        >
+          <IconEye size={18} />
+        </button>
+      )}
+      {arLike && arLoc && mode === "map" && (
+        <button
+          className="topbar-btn"
+          title={appMode === "live" ? "現在地に戻る" : "撮影地点に戻る"}
+          aria-label={appMode === "live" ? "現在地に戻る" : "撮影地点に戻る"}
+          onClick={recenterAr}
+        >
+          <IconPin size={18} />
+        </button>
+      )}
+    </div>
+  );
+
   // 検索（モード選択＋入力＋結果）。各下部ドックで使い回す。
   const searchPanel = (
     <div className="dock-search">
@@ -2194,6 +2251,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {arPanelOpen && (
             <div className="ar-dock-body">
+            {dockControls}
           {arStep === "locate" && (
             <>
               <div className="ar-hint">
@@ -2439,68 +2497,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
         </svg>
       )}
 
-      {/* 上部アイコンバー（左上）。メニュー・現在地・カメラ・2D3D・自由視点をアイコンのみで横並び。 */}
+      {/* 上部はメニュー(☰)のみ。他の操作（現在地/カメラ/2D3D/自由視点/撮影地点に戻る）は各ドック内へ。 */}
       <div className="topbar">
-        <button
-          className="topbar-btn"
-          title="メニュー"
-          aria-label="メニュー"
-          onClick={() => setSidebarOpen((o) => !o)}
-        >
+        <button className="topbar-btn" title="メニュー" aria-label="メニュー" onClick={() => setSidebarOpen((o) => !o)}>
           ☰
         </button>
-        {mode === "map" && (
-          <button
-            className="topbar-btn"
-            title="現在地へ移動"
-            aria-label="現在地へ移動"
-            onClick={goToCurrentLocation}
-            disabled={locating}
-          >
-            {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
-          </button>
-        )}
-        {simView && (
-          <button
-            className={`topbar-btn${mode === "camera" ? " is-active" : ""}`}
-            title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
-            aria-label={mode === "map" ? "カメラ視点" : "地図に戻る"}
-            onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
-          >
-            {mode === "map" ? <IconCamera size={18} /> : <IconMap size={18} />}
-          </button>
-        )}
-        {mode === "map" && (
-          <button
-            className="topbar-btn"
-            title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
-            aria-label={map2D ? "3D表示に切り替え" : "2D表示に切り替え"}
-            onClick={() => setMap2D((v) => !v)}
-          >
-            {map2D ? <IconCube size={18} /> : <IconGrid size={18} />}
-          </button>
-        )}
-        {showCelestial && mode === "map" && (
-          <button
-            className={`topbar-btn${freeLook ? " is-active" : ""}`}
-            title="自由視点：地図解像度・太陽・月を固定したまま視点だけ動かす。解除すると元の視点へ戻ります"
-            aria-label="自由視点"
-            onClick={toggleFreeLook}
-          >
-            <IconEye size={18} />
-          </button>
-        )}
-        {/* AR/ライブ: 決めた地点へ視点を戻す（アイコンのみ） */}
-        {arLike && arLoc && mode === "map" && (
-          <button
-            className="topbar-btn"
-            title={appMode === "live" ? "現在地に戻る" : "撮影地点に戻る"}
-            aria-label={appMode === "live" ? "現在地に戻る" : "撮影地点に戻る"}
-            onClick={recenterAr}
-          >
-            <IconPin size={18} />
-          </button>
-        )}
       </div>
       {locError && mode === "map" && <div className="locate-warn">{locError}</div>}
 
@@ -2538,6 +2539,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             onPointerDown={onDockGripDown}
           >
             {arStepsBar}
+            {dockControls}
             <button
               className="ar-panel-toggle"
               title={arPanelOpen ? "畳む（縦画像を大きく）" : "開く"}
@@ -2709,10 +2711,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </>
               ) : (
                 <>
-                  <IconMap size={15} /> 地図・検索
+                  <IconMap size={15} /> 地図
                 </>
               )}
             </span>
+            {dockControls}
             <button
               className="ar-panel-toggle"
               title={modePanelOpen ? "畳む" : "開く"}
