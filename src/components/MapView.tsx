@@ -2183,6 +2183,20 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
       {input}
     </label>
   );
+  // モードのパネルタイトル（ホームのカード名と揃える）。地図ドック・カメラHUDで共用。
+  const modeTitle = showCelestial ? (
+    <>
+      <IconSun size={15} /> 太陽・月の動きを見る
+    </>
+  ) : isOffline ? (
+    <>
+      <IconDownload size={15} /> オフライン保存
+    </>
+  ) : (
+    <>
+      <IconMountain size={15} /> 地形を見る
+    </>
+  );
   // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
   const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
     const open = dockSecOpen[id] ?? true;
@@ -2617,6 +2631,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             onPointerDown={onDockGripDown}
           >
             {arStepsBar}
+            {simView && <span className="mode-panel-title">{modeTitle}</span>}
             <button
               className="ar-panel-toggle"
               title={arPanelOpen ? "畳む（縦画像を大きく）" : "開く"}
@@ -2756,21 +2771,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           style={{ transform: `translate(calc(-50% + ${arDockOffset.x}px), ${arDockOffset.y}px)` }}
         >
           <div className="cam-hud-grip ar-panel-grip" onPointerDown={onDockGripDown}>
-            <span className="mode-panel-title">
-              {showCelestial ? (
-                <>
-                  <IconSun size={15} /> 太陽・月
-                </>
-              ) : isOffline ? (
-                <>
-                  <IconDownload size={15} /> オフライン保存
-                </>
-              ) : (
-                <>
-                  <IconMap size={15} /> 地図
-                </>
-              )}
-            </span>
+            <span className="mode-panel-title">{modeTitle}</span>
             <button
               className="ar-panel-toggle"
               title={modePanelOpen ? "畳む" : "開く"}
