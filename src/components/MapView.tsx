@@ -1914,39 +1914,37 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     </div>
   );
 
-  // 各ドックの操作ボタン群（現在地/カメラ/2D3D/自由視点/撮影地点に戻る）。出し分けは各自で gate。
+  // 各ドックの操作行。状態を持つもの（地図/カメラ・2D/3D）は選択ボタン（セグメント）で現在値を明示。
+  // 動作（現在地/撮影地点に戻る）と 自由視点トグルはアイコンボタン。出し分けは各自で gate。
   const dockControls = (
-    <div className="dock-controls">
-      {mode === "map" && (
-        <button
-          className="topbar-btn"
-          title="現在地へ移動"
-          aria-label="現在地へ移動"
-          onClick={goToCurrentLocation}
-          disabled={locating}
-        >
-          {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
-        </button>
-      )}
+    <div className="dock-viewbar">
       {simView && (
-        <button
-          className={`topbar-btn${mode === "camera" ? " is-active" : ""}`}
-          title={mode === "map" ? "カメラ視点：今見ている地点に立って見回す" : "地図に戻る"}
-          aria-label={mode === "map" ? "カメラ視点" : "地図に戻る"}
-          onClick={mode === "map" ? () => enterCameraMode() : exitCameraMode}
-        >
-          {mode === "map" ? <IconCamera size={18} /> : <IconMap size={18} />}
-        </button>
+        <div className="seg" role="group" aria-label="視点">
+          <button
+            className={mode === "map" ? "is-active" : ""}
+            title="地図（俯瞰）"
+            onClick={() => mode === "camera" && exitCameraMode()}
+          >
+            <IconMap size={14} /> 地図
+          </button>
+          <button
+            className={mode === "camera" ? "is-active" : ""}
+            title="カメラ視点（立って見回す）"
+            onClick={() => mode === "map" && enterCameraMode()}
+          >
+            <IconCamera size={14} /> カメラ
+          </button>
+        </div>
       )}
       {mode === "map" && (
-        <button
-          className="topbar-btn"
-          title={map2D ? "3D（傾けられる地形）に切り替え" : "2D（真上の地図）に切り替え"}
-          aria-label={map2D ? "3D表示に切り替え" : "2D表示に切り替え"}
-          onClick={() => setMap2D((v) => !v)}
-        >
-          {map2D ? <IconCube size={18} /> : <IconGrid size={18} />}
-        </button>
+        <div className="seg" role="group" aria-label="地図の表示">
+          <button className={!map2D ? "is-active" : ""} title="3D（傾けられる地形）" onClick={() => setMap2D(false)}>
+            <IconCube size={14} /> 3D
+          </button>
+          <button className={map2D ? "is-active" : ""} title="2D（真上の地図）" onClick={() => setMap2D(true)}>
+            <IconGrid size={14} /> 2D
+          </button>
+        </div>
       )}
       {showCelestial && mode === "map" && (
         <button
@@ -1956,6 +1954,11 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           onClick={toggleFreeLook}
         >
           <IconEye size={18} />
+        </button>
+      )}
+      {mode === "map" && (
+        <button className="topbar-btn" title="現在地へ移動" aria-label="現在地へ移動" onClick={goToCurrentLocation} disabled={locating}>
+          {locating ? <span className="spinner" aria-hidden="true" /> : <IconLocate size={18} />}
         </button>
       )}
       {arLike && arLoc && mode === "map" && (
@@ -2539,7 +2542,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             onPointerDown={onDockGripDown}
           >
             {arStepsBar}
-            {dockControls}
             <button
               className="ar-panel-toggle"
               title={arPanelOpen ? "畳む（縦画像を大きく）" : "開く"}
@@ -2551,6 +2553,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {arPanelOpen && (
           <>
+          {dockControls}
           {arLike && arStep === "align" && (
             <div className="stage-controls">
               {editModeToggle}
@@ -2715,7 +2718,6 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 </>
               )}
             </span>
-            {dockControls}
             <button
               className="ar-panel-toggle"
               title={modePanelOpen ? "畳む" : "開く"}
@@ -2727,6 +2729,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           </div>
           {modePanelOpen && (
             <div className="mode-dock-body">
+              {dockControls}
               {searchPanel}
               {basemapPanel}
               {showCelestial && celestialControls}
