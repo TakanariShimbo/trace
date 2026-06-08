@@ -2007,15 +2007,16 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           }
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button type="submit" title="検索" aria-label="検索" disabled={searching}>
+        <button type="submit" className="search-go" title="検索" aria-label="検索" disabled={searching}>
           {searching ? (
             <span className="spinner" aria-hidden="true" />
           ) : (
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <circle cx="10.5" cy="10.5" r="6.5" />
               <line x1="15.5" y1="15.5" x2="21" y2="21" />
             </svg>
           )}
+          <span>検索</span>
         </button>
       </form>
       {results.length > 0 && (
