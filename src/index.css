@@ -1,6 +1,8 @@
 :root {
   color-scheme: dark;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* パネル内ボタンの共通高さ。すべての操作ボタンはこの高さに揃える（幅は中身次第）。 */
+  --btn-h: 36px;
 }
 
 * {
@@ -221,6 +223,7 @@ body,
 /* セグメント選択（航空写真スイッチと同系統。現在値を明示）。 */
 .seg {
   display: inline-flex;
+  min-height: var(--btn-h);
   background: rgba(40, 52, 68, 0.5);
   border: 1px solid rgba(130, 150, 175, 0.28);
   border-radius: 8px;
@@ -258,7 +261,8 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 7px 11px;
+  min-height: var(--btn-h);
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 600;
   color: #cdd6e2;
@@ -375,6 +379,7 @@ body,
 }
 .edit-mode-toggle {
   display: inline-flex;
+  min-height: var(--btn-h);
   background: rgba(40, 52, 68, 0.5);
   border: 1px solid rgba(130, 150, 175, 0.28);
   border-radius: 9px;
@@ -407,8 +412,8 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 28px;
+  width: 34px;
+  height: var(--btn-h);
   color: #cdd6e2;
   background: rgba(40, 52, 68, 0.55);
   border: 1px solid rgba(130, 150, 175, 0.28);
@@ -459,7 +464,8 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  min-height: var(--btn-h);
+  padding: 0 12px;
   font-size: 12px;
   color: #e6edf5;
   background: rgba(79, 134, 198, 0.22);
@@ -687,7 +693,8 @@ body,
 .dt-date {
   flex: 1;
   min-width: 0;
-  padding: 6px 8px;
+  min-height: var(--btn-h);
+  padding: 0 8px;
   font-size: 13px;
   color: #e6edf5;
   background: rgba(255, 255, 255, 0.04);
@@ -703,7 +710,8 @@ body,
   text-align: center;
 }
 .dt-now {
-  padding: 7px 11px;
+  min-height: var(--btn-h);
+  padding: 0 12px;
   font-size: 12px;
   font-weight: 600;
   color: #cdd6e2;
@@ -999,7 +1007,8 @@ body,
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 9px 12px;
+  min-height: var(--btn-h);
+  padding: 0 12px;
   font-size: 13px;
   color: #e6edf5;
   background: rgba(40, 52, 68, 0.9);
@@ -1280,15 +1289,20 @@ body,
   opacity: 0.85;
 }
 /* 進む/戻る等のボタン行 */
+/* フッターの操作行。主ボタン（進む/確定）は幅いっぱいに伸ばし、戻る等は中身幅。
+   オフラインの「ダウンロード」(.save-actions) と同じルールで画面ごとに揃える。 */
 .ar-dock-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
 }
-/* アイコンのみのナビボタン（進む/戻る）を正方形寄りに */
+.ar-dock-actions .ar-btn-main {
+  flex: 1;
+}
+/* アイコンのみのナビボタン（戻る等）を正方形寄りに。高さは共通トークンに従う。 */
 .ar-btn--icon {
-  padding: 10px 12px;
+  flex: none;
+  padding: 0 12px;
   justify-content: center;
 }
 .ar-step {
@@ -1356,8 +1370,10 @@ body,
 .ar-btn-main {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 11px 20px;
+  min-height: var(--btn-h);
+  padding: 0 18px;
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
@@ -1377,8 +1393,10 @@ body,
 .ar-btn-sub {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 11px 16px;
+  min-height: var(--btn-h);
+  padding: 0 14px;
   font-size: 13px;
   white-space: nowrap;
   color: #e6edf5;
@@ -1576,7 +1594,8 @@ body,
   justify-content: center;
   gap: 6px;
   width: 100%;
-  padding: 7px 10px;
+  min-height: var(--btn-h);
+  padding: 0 10px;
   font-size: 12.5px;
   white-space: nowrap;
   color: #cdd6e2;

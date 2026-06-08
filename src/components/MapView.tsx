@@ -2378,6 +2378,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               {dockControls}
               {/* 内容 */}
               {arStep === "locate" && appMode !== "live" && dockSection("arsearch", "検索", searchPanel)}
+              {arStep === "select" && dockSection("arsearch", "検索", searchPanel)}
               {arStep === "params" &&
                 dockSection(
                   "arparams",
@@ -2426,12 +2427,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                     </button>
                   )}
                   <button
-                    className="ar-btn-main ar-btn--icon"
+                    className="ar-btn-main"
                     title="ここで決定（次へ）"
                     aria-label="ここで決定（次へ）"
                     disabled={!arLoc}
                     onClick={confirmArLocate}
                   >
+                    次へ
                     <IconChevron dir="right" size={18} />
                   </button>
                 </div>
@@ -2441,7 +2443,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                   <button className="ar-btn-sub ar-btn--icon" title="撮影地点へ戻る" aria-label="撮影地点へ戻る" onClick={backToLocate}>
                     <IconChevron dir="left" size={18} />
                   </button>
-                  <button className="ar-btn-main ar-btn--icon" title="山を選ぶ（次へ）" aria-label="山を選ぶ（次へ）" onClick={confirmArParams}>
+                  <button className="ar-btn-main" title="山を選ぶ（次へ）" aria-label="山を選ぶ（次へ）" onClick={confirmArParams}>
+                    次へ
                     <IconChevron dir="right" size={18} />
                   </button>
                 </div>
@@ -2453,11 +2456,12 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                   </button>
                   <span className="ar-select-count">選択 {peakSelCount} 山</span>
                   <button
-                    className="ar-btn-main ar-btn--icon"
+                    className="ar-btn-main"
                     title={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     aria-label={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     onClick={goAlignFromSelect}
                   >
+                    次へ
                     <IconChevron dir="right" size={18} />
                   </button>
                 </div>
@@ -2715,7 +2719,8 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
               <button className="ar-btn-sub ar-btn--icon" title="山選択へ戻る" aria-label="山選択へ戻る" onClick={backToSelect}>
                 <IconChevron dir="left" size={18} />
               </button>
-              <button className="ar-btn-main ar-btn--icon" title="仕上げ（次へ）" aria-label="仕上げ（次へ）" onClick={goExport}>
+              <button className="ar-btn-main" title="仕上げ（次へ）" aria-label="仕上げ（次へ）" onClick={goExport}>
+                次へ
                 <IconChevron dir="right" size={18} />
               </button>
             </div>
