@@ -200,7 +200,9 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0d12;
+  background:
+    radial-gradient(720px 520px at 50% 40%, rgba(70, 110, 170, 0.2), transparent 70%),
+    linear-gradient(180deg, #0c1118 0%, #0a0d12 100%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s ease;
@@ -216,7 +218,9 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0d12;
+  background:
+    radial-gradient(720px 520px at 50% 40%, rgba(70, 110, 170, 0.2), transparent 70%),
+    linear-gradient(180deg, #0c1118 0%, #0a0d12 100%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.32s ease;
@@ -225,13 +229,25 @@ body,
 .screen-fade.is-on {
   pointer-events: auto;
 }
-/* 暗転中に出す「切替先」カード（地図／風景／各モード）。ホームのカード調で揃える。 */
+/* 暗転中の中身が「ふわっと現れる」共通モーション（下からせり上がり＋微拡大）。 */
+@keyframes fade-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+/* 暗転中に出す「切替先」カード（各モード）。ホームのカード調で揃える。 */
 .view-fade-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: #e6edf5;
+  animation: fade-content-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .view-fade-ico {
   display: inline-flex;
@@ -239,9 +255,12 @@ body,
   justify-content: center;
   width: 64px;
   height: 64px;
-  border-radius: 16px;
-  color: #bcd6f5;
-  background: rgba(79, 134, 198, 0.2);
+  border-radius: 18px;
+  color: #cfe0f7;
+  background: linear-gradient(160deg, rgba(86, 140, 205, 0.32), rgba(79, 134, 198, 0.16));
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 190, 245, 0.22),
+    0 12px 36px rgba(38, 84, 146, 0.42);
 }
 .view-fade-name {
   max-width: 80vw;
@@ -261,15 +280,18 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 11px 20px;
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #e6edf5;
   background: rgba(40, 52, 68, 0.6);
   border: 1px solid rgba(130, 150, 175, 0.3);
-  border-radius: 12px;
-  animation: fade-pill-pulse 1.4s ease-in-out infinite;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation:
+    fade-content-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    fade-pill-pulse 1.6s ease-in-out 0.5s infinite;
 }
 .fade-pill-ico {
   display: inline-flex;
@@ -290,23 +312,36 @@ body,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
+  animation: fade-content-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 .fade-steps-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 .fade-step {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   font-size: 12px;
   font-weight: 700;
   color: #8294aa;
   background: rgba(130, 150, 175, 0.18);
   border-radius: 50%;
+}
+/* ステップ間をつなぐ細い線（ステッパー感）。 */
+.fade-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  right: 100%;
+  width: 10px;
+  height: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(130, 150, 175, 0.28);
 }
 .fade-step.is-current {
   color: #fff;
@@ -1281,8 +1316,8 @@ body,
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 18px;
+  padding: 16px 18px;
   text-align: left;
   color: #e6edf5;
   background: rgba(20, 27, 38, 0.8);
@@ -1313,7 +1348,7 @@ body,
 .home-card-text {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
 }
 .home-card-title {
