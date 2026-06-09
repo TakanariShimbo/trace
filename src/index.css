@@ -254,6 +254,25 @@ body,
   font-size: 12px;
   color: #9fb0c4;
 }
+/* 暗転中の「Loading…」（右下）。地図⇄風景・ホーム⇄モードの遷移で共用。 */
+.fade-loading {
+  position: absolute;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #8a98ad;
+  animation: fade-loading-pulse 1.2s ease-in-out infinite;
+}
+@keyframes fade-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
 
 /* --- カメラ視点HUD（下中央） --- */
 .cam-hud {

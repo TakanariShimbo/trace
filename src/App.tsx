@@ -49,6 +49,7 @@ export default function App() {
             <span className="view-fade-name">{card.title}</span>
           </div>
         )}
+        {card && <span className="fade-loading">Loading…</span>}
       </div>
     </>
   );
