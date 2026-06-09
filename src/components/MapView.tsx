@@ -121,8 +121,10 @@ type ArLabel = {
   dotV: number;
   labelU: number;
   labelV: number;
-  description?: string; // 解説（Wikipedia）。下部キャプション・焼き込みに使う。
-  source?: string; // 出典URL（Wikipedia 記事）
+  description?: string; // 解説（日本語）。キャプション・焼き込みに使う。
+  descriptionEn?: string; // 解説（英語）。
+  nameEn?: string; // 英名（例: Mt. Fuji）。
+  source?: string; // 参考URL
 };
 
 export default function MapView({ appMode, onHome, settings }: MapViewProps) {
@@ -232,8 +234,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [arLabels, setArLabels] = useState<ArLabel[]>([]);
   // 下部キャプション（スクショ風の解説帯）で取り上げる山。arLabels内のindex。
   const [captionIdx, setCaptionIdx] = useState(0);
-  // 解説キャプションを写真に焼き込むか（既定ON）。解説のある山が無ければ無効。
-  const [bakeCaption, setBakeCaption] = useState(true);
+  // 解説キャプションの言語: 日本語のみ / 英語のみ / 両方 / なし。
+  const [captionLang, setCaptionLang] = useState<"ja" | "en" | "both" | "none">("ja");
+  const bakeCaption = captionLang !== "none"; // 解説を焼き込むか
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 解説・ラベル共通の文字サイズ倍率（小0.8 / 中1.0 / 大1.25）。
@@ -1674,15 +1677,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     setArStep("select");
   };
   // 仕上げ(⑤)で編集した位置（arLabels）を写真に焼き込み、合成JPEGのデータURLを返す。
-  // キャプション用に解説を短く整える（長すぎると写真を覆うため。文末。で丸める）。
-  const shortDesc = (s?: string): string => {
-    if (!s) return "";
-    const max = 120;
-    if (s.length <= max) return s;
-    const cut = s.slice(0, max);
-    const p = cut.lastIndexOf("。");
-    return p > max * 0.5 ? cut.slice(0, p + 1) : cut + "…";
-  };
 
   const bakeComposite = async (): Promise<string | null> => {
     if (!photoUrl) return null;
@@ -1740,49 +1734,64 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       }
     }
 
-    // 解説ブロック（可動カード）。captionPos の位置に、山名＋標高＋解説＋出典を角丸カードで焼く。
+    // 解説（可動ブロック・背景なし・影付き）。captionLang に応じ 日本語/英語/両方 を出す。両方は2カラム。
     const cap = arLabels[captionIdx];
-    if (bakeCaption && cap?.description) {
-      const boxW = Math.round(W * 0.62); // ブロック幅
-      const pad = Math.round(boxW * 0.05);
-      const titleFs = Math.round(L * 0.028 * arFontScale); // 長辺の2.8%×倍率
-      const bodyFs = Math.round(L * 0.021 * arFontScale); // 2.1%
-      const srcFs = Math.round(L * 0.014 * arFontScale); // 1.4%
-      const titleLineH = Math.round(titleFs * 1.35);
-      const lineH = Math.round(bodyFs * 1.55);
-      const srcLineH = Math.round(srcFs * 1.9);
-      const textW = boxW - pad * 2;
-      // 本文を文字単位で折り返し（日本語は単語境界が無いため）
-      ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
-      ctx.textAlign = "left";
-      const lines: string[] = [];
-      let cur = "";
-      for (const ch of shortDesc(cap.description)) {
-        if (ch === "\n") { lines.push(cur); cur = ""; continue; }
-        if (cur && ctx.measureText(cur + ch).width > textW) { lines.push(cur); cur = ch; }
-        else cur += ch;
+    if (captionLang !== "none" && cap && (cap.description || cap.descriptionEn)) {
+      const cols: { title: string; body: string }[] = [];
+      if ((captionLang === "ja" || captionLang === "both") && cap.description)
+        cols.push({ title: `${cap.name}  ${Math.round(cap.elevM)}m`, body: cap.description });
+      if ((captionLang === "en" || captionLang === "both") && cap.descriptionEn)
+        cols.push({ title: `${cap.nameEn || cap.name}  ${Math.round(cap.elevM)} m`, body: cap.descriptionEn });
+      if (cols.length) {
+        const titleFs = Math.round(L * 0.026 * arFontScale);
+        const bodyFs = Math.round(L * 0.02 * arFontScale);
+        const srcFs = Math.round(L * 0.013 * arFontScale);
+        const titleLineH = Math.round(titleFs * 1.3);
+        const lineH = Math.round(bodyFs * 1.5);
+        const colGap = Math.round(W * 0.035);
+        const colW = cols.length > 1 ? Math.round(W * 0.44) : Math.round(W * 0.52);
+        const blockW = colW * cols.length + colGap * (cols.length - 1);
+        ctx.textAlign = "left";
+        // 各カラムの本文を折り返し
+        const wrapped = cols.map((c) => {
+          ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+          const lines: string[] = [];
+          let curL = "";
+          for (const ch of c.body) {
+            if (ch === "\n") { lines.push(curL); curL = ""; continue; }
+            if (curL && ctx.measureText(curL + ch).width > colW) { lines.push(curL); curL = ch; }
+            else curL += ch;
+          }
+          if (curL) lines.push(curL);
+          return { title: c.title, lines };
+        });
+        const maxLines = Math.max(...wrapped.map((w) => w.lines.length));
+        const blockH = titleLineH + maxLines * lineH + Math.round(srcFs * 2);
+        const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
+        const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
+        // 影で可読性を確保（背景ボックスなし）
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.9)";
+        ctx.shadowBlur = Math.round(L * 0.006);
+        ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
+        wrapped.forEach((w, ci) => {
+          const cx = bx + ci * (colW + colGap);
+          let ty = by;
+          ctx.fillStyle = "#fff";
+          ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
+          ctx.fillText(w.title, cx, ty + titleFs);
+          ty += titleLineH;
+          ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+          ctx.fillStyle = "rgba(255,255,255,0.97)";
+          for (const ln of w.lines) { ctx.fillText(ln, cx, ty + bodyFs); ty += lineH; }
+        });
+        // 出典（1回、左下）
+        ctx.fillStyle = "rgba(255,255,255,0.78)";
+        ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
+        const srcText = captionLang === "en" ? "Auto-generated from facts (ref: Wikipedia et al.)" : "解説は事実をもとに自動生成（参考: Wikipedia ほか）";
+        ctx.fillText(srcText, bx, by + titleLineH + maxLines * lineH + srcFs);
+        ctx.restore();
       }
-      if (cur) lines.push(cur);
-      const boxH = pad * 2 + titleLineH + lines.length * lineH + srcLineH;
-      // captionPos（左上）を画像内に収める
-      const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - boxW));
-      const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - boxH));
-      // 角丸の半透明カード
-      ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-      ctx.beginPath();
-      ctx.roundRect(bx, by, boxW, boxH, Math.round(bodyFs * 0.7));
-      ctx.fill();
-      let top = by + pad;
-      ctx.fillStyle = "#fff";
-      ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText(`${cap.name}  ${Math.round(cap.elevM)}m`, bx + pad, top + titleFs);
-      top += titleLineH;
-      ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.94)";
-      for (const ln of lines) { ctx.fillText(ln, bx + pad, top + bodyFs); top += lineH; }
-      ctx.fillStyle = "rgba(255,255,255,0.62)";
-      ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
-      ctx.fillText("解説は事実をもとに自動生成（参考: Wikipedia ほか）", bx + pad, top + srcFs);
     }
     return canvas.toDataURL("image/jpeg", 0.92);
   };
@@ -1803,6 +1812,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         labelU: p.u,
         labelV: Math.max(0.06, p.v - 0.12), // 名札は点の少し上を初期位置に
         description: d?.extract,
+        descriptionEn: d?.extractEn,
+        nameEn: d?.nameEn,
         source: d?.url,
       };
     });
@@ -1878,9 +1889,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const v = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
     if (d.kind === "caption") {
       const off = captionDragRef.current ?? { offU: 0, offV: 0 };
-      // ブロック幅62%・高さ余裕ぶん、フレーム内に収める（焼き込みのクランプと一致）。
+      // ブロック幅（単独55%・両方92%）ぶん、フレーム内に収める。
+      const maxU = captionLang === "both" ? 0.08 : 0.45;
       setCaptionPos({
-        u: Math.min(0.38, Math.max(0, u - off.offU)),
+        u: Math.min(maxU, Math.max(0, u - off.offU)),
         v: Math.min(0.82, Math.max(0, v - off.offV)),
       });
       return;
@@ -2688,23 +2700,44 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 ))}
               </>
             )}
-            {/* 解説ブロック（可動カード）。ドラッグで写真内の好きな位置へ。焼き込み結果のプレビュー。 */}
-            {bakeCaption && arLabels[captionIdx]?.description && (
-              <div
-                className="ar-caption"
-                style={{ left: `${captionPos.u * 100}%`, top: `${captionPos.v * 100}%` }}
-                onPointerDown={onCaptionDown}
-                onPointerMove={onEditMove}
-                onPointerUp={onEditUp}
-              >
-                <div className="ar-caption-title">
-                  {arLabels[captionIdx].name}
-                  <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
+            {/* 解説（可動ブロック・背景なし）。言語モードで 日本語/英語/両方。両方は2カラム。 */}
+            {captionLang !== "none" &&
+              arLabels[captionIdx] &&
+              (arLabels[captionIdx].description || arLabels[captionIdx].descriptionEn) && (
+                <div
+                  className={`ar-caption${captionLang === "both" ? " ar-caption--both" : ""}`}
+                  style={{ left: `${captionPos.u * 100}%`, top: `${captionPos.v * 100}%` }}
+                  onPointerDown={onCaptionDown}
+                  onPointerMove={onEditMove}
+                  onPointerUp={onEditUp}
+                >
+                  <div className="ar-cap-cols">
+                    {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
+                      <div className="ar-cap-col">
+                        <div className="ar-caption-title">
+                          {arLabels[captionIdx].name}
+                          <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
+                        </div>
+                        <p className="ar-caption-text">{arLabels[captionIdx].description}</p>
+                      </div>
+                    )}
+                    {(captionLang === "en" || captionLang === "both") && arLabels[captionIdx].descriptionEn && (
+                      <div className="ar-cap-col">
+                        <div className="ar-caption-title">
+                          {arLabels[captionIdx].nameEn || arLabels[captionIdx].name}
+                          <b>{Math.round(arLabels[captionIdx].elevM)} m</b>
+                        </div>
+                        <p className="ar-caption-text">{arLabels[captionIdx].descriptionEn}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="ar-caption-src">
+                    {captionLang === "en"
+                      ? "Auto-generated from facts (ref: Wikipedia et al.)"
+                      : "解説は事実をもとに自動生成（参考: Wikipedia ほか）"}
+                  </div>
                 </div>
-                <p className="ar-caption-text">{shortDesc(arLabels[captionIdx].description)}</p>
-                <div className="ar-caption-src">解説は事実をもとに自動生成（参考: Wikipedia ほか）</div>
-              </div>
-            )}
+              )}
           </div>
           <div
             className="cam-hud"
@@ -2747,15 +2780,24 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     </label>
                     {arLabels.some((l) => l.description) && (
                       <>
-                        <label className="switch-row">
-                          <span>写真に解説を入れる</span>
-                          <input
-                            type="checkbox"
-                            className="switch"
-                            checked={bakeCaption}
-                            onChange={(e) => setBakeCaption(e.target.checked)}
-                          />
-                        </label>
+                        {/* 解説の言語: 日本語のみ / 英語のみ / 両方 / なし */}
+                        <div className="ar-fs-row">
+                          <span>解説</span>
+                          <div className="seg" role="group" aria-label="解説の言語">
+                            {(
+                              [
+                                ["日本語", "ja"],
+                                ["英語", "en"],
+                                ["両方", "both"],
+                                ["なし", "none"],
+                              ] as [string, "ja" | "en" | "both" | "none"][]
+                            ).map(([lab, v]) => (
+                              <button key={v} className={captionLang === v ? "is-active" : ""} onClick={() => setCaptionLang(v)}>
+                                {lab}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
                           <div className="ar-caption-pick">
                             {arLabels.map((l, i) =>

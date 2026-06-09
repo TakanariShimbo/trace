@@ -1757,20 +1757,32 @@ body,
 /* 解説ブロック（可動カード）。写真内をドラッグで配置でき、焼き込み結果のプレビューを兼ねる。 */
 .ar-caption {
   position: absolute;
-  width: 62%;
-  padding: 3.1%; /* ステージ幅基準（焼き込みの boxW*0.05 と一致） */
+  width: 55%;
   color: #fff;
-  background: rgba(0, 0, 0, 0.6);
-  border-radius: 1.6cqmax;
+  /* 背景ボックスは無し。影で可読性を確保（写真長辺基準）。 */
+  text-shadow:
+    0 0.1cqmax 0.55cqmax rgba(0, 0, 0, 0.92),
+    0 0 0.25cqmax rgba(0, 0, 0, 0.85);
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
+.ar-caption--both {
+  width: 92%; /* 日英2カラム */
+}
 .ar-caption:active {
   cursor: grabbing;
 }
+.ar-cap-cols {
+  display: flex;
+  gap: 3.5%;
+}
+.ar-cap-col {
+  flex: 1;
+  min-width: 0;
+}
 .ar-caption-title {
-  font-size: calc(2.8cqmax * var(--ar-fs, 1)); /* 写真長辺の 2.8% × 倍率 */
+  font-size: calc(2.6cqmax * var(--ar-fs, 1)); /* 写真長辺の 2.6% × 倍率 */
   font-weight: 700;
   display: flex;
   align-items: baseline;
@@ -1782,15 +1794,15 @@ body,
   color: #cfe0f5;
 }
 .ar-caption-text {
-  margin: 0.4em 0 0;
-  font-size: calc(2.1cqmax * var(--ar-fs, 1));
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.94);
+  margin: 0.35em 0 0;
+  font-size: calc(2cqmax * var(--ar-fs, 1));
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.97);
 }
 .ar-caption-src {
-  margin-top: 0.5em;
-  font-size: calc(1.4cqmax * var(--ar-fs, 1));
-  color: rgba(255, 255, 255, 0.62);
+  margin-top: 0.4em;
+  font-size: calc(1.3cqmax * var(--ar-fs, 1));
+  color: rgba(255, 255, 255, 0.82);
 }
 /* 文字サイズ選択行（ラベル左＋セグメント右） */
 .ar-fs-row {

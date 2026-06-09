@@ -22,11 +22,13 @@ export type MountainHit = {
   prefecture?: string;
 };
 
-// 山の解説（Wikipedia 日本語版より。CC BY-SA 4.0）。id で引く。本体が重いのでARなどで遅延ロード。
+// 山の解説（事実ベースでAI生成）。id で引く。本体が重いのでARなどで遅延ロード。
 export type MountainDescription = {
-  title: string; // Wikipedia 記事タイトル
-  extract: string; // 冒頭抜粋
-  url: string; // 出典記事URL
+  title: string; // 山名（日本語）
+  extract: string; // 日本語解説
+  extractEn?: string; // 英語解説
+  nameEn?: string; // 英名（例: Mt. Fuji）
+  url?: string; // 参考URL
 };
 
 let cache: MountainRecord[] | null = null;
@@ -77,10 +79,11 @@ export async function loadMountainDescriptions(): Promise<Map<number, MountainDe
   const url = `${import.meta.env.BASE_URL}data/mountain_descriptions.json`;
   descLoading = fetch(url)
     .then((r) => (r.ok ? r.json() : { descriptions: {} }))
-    .then((d: { descriptions?: Record<string, MountainDescription> }) => {
+    .then((d: { descriptions?: Record<string, { title: string; extract: string; extract_en?: string; name_en?: string; url?: string }> }) => {
       const map = new Map<number, MountainDescription>();
       for (const [id, v] of Object.entries(d.descriptions ?? {})) {
-        if (v?.extract) map.set(Number(id), { title: v.title, extract: v.extract, url: v.url });
+        if (v?.extract)
+          map.set(Number(id), { title: v.title, extract: v.extract, extractEn: v.extract_en, nameEn: v.name_en, url: v.url });
       }
       descCache = map;
       return map;
