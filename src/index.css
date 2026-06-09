@@ -193,18 +193,48 @@ body,
   border-color: rgba(120, 180, 240, 0.65);
 }
 
-/* 地図↔風景の切替を隠す暗転フェード。最前面で全画面を覆い、切替の瞬間だけ黒くする。 */
+/* 地図↔風景の切替を隠す暗転フェード。最前面で全画面を覆い、切替中だけ黒くして切替先カードを出す。 */
 .view-fade {
   position: absolute;
   inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #0a0d12;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.17s ease;
+  transition: opacity 0.22s ease;
   z-index: 100;
 }
 .view-fade.is-on {
   pointer-events: auto; /* 切替中は誤操作を防ぐ */
+}
+/* 暗転中に出す「切替先」カード（地図／風景）。ホームのカード調で揃える。 */
+.view-fade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: #e6edf5;
+}
+.view-fade-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  color: #bcd6f5;
+  background: rgba(79, 134, 198, 0.2);
+}
+.view-fade-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.view-fade-sub {
+  font-size: 12px;
+  color: #9fb0c4;
 }
 
 /* --- カメラ視点HUD（下中央） --- */

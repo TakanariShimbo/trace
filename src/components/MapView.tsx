@@ -203,6 +203,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [mode, setMode] = useState<"map" | "camera">("map");
   // 地図↔風景の切替時、暗転で「カメラの飛び＋地形の作り直し」を隠す（0=透明 / 1=暗転）。
   const [viewFade, setViewFade] = useState(0);
+  const [fadeTarget, setFadeTarget] = useState<"map" | "camera" | null>(null); // 暗転中に出す切替先
   const fadeBusyRef = useRef(false);
   const [camHeading, setCamHeading] = useState(0);
   const [camPitch, setCamPitch] = useState(0);
@@ -1410,18 +1411,21 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   };
 
   // 地図↔風景の切替を暗転でつなぐ。暗転しきってから実際の切替（カメラ移動＋地形再生成）を行い、
-  // 1フレーム置いて新しい絵が整ってから明転する。暴れる瞬間がユーザーに見えない。
-  const switchViewWithFade = (doSwitch: () => void) => {
+  // 地形が整うまで黒を保持してから明転する。暴れる瞬間がユーザーに見えない。
+  // 暗転中は切替先（地図/風景）のカードを出すので、長めの暗転でも「読み込み中」として自然。
+  const switchViewWithFade = (target: "map" | "camera", doSwitch: () => void) => {
     if (fadeBusyRef.current) return;
     fadeBusyRef.current = true;
-    setViewFade(1); // 暗転（CSSトランジションで 0→1）
+    setFadeTarget(target);
+    setViewFade(1); // 暗転（CSSトランジションで 0→1、220ms）
     window.setTimeout(() => {
       doSwitch(); // 暗転中に切替（カメラの飛び・地形リビルドを隠す）
       window.setTimeout(() => {
         setViewFade(0); // 明転（1→0）
         fadeBusyRef.current = false;
-      }, 90); // リビルド＆1フレーム描画の猶予
-    }, 170); // 暗転しきるまで
+        window.setTimeout(() => setFadeTarget(null), 240); // 明転後にカードを片付け
+      }, 420); // リビルド＆LODが落ち着くまで黒を保持
+    }, 220); // 暗転しきるまで
   };
 
   // カメラ視点モードへ（太陽月は維持。自由視点はマップ専用なのでオフにしてから入る）。
@@ -1964,14 +1968,14 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
           <button
             className={mode === "map" ? "is-active" : ""}
             title="地図（俯瞰）"
-            onClick={() => mode === "camera" && switchViewWithFade(exitCameraMode)}
+            onClick={() => mode === "camera" && switchViewWithFade("map", exitCameraMode)}
           >
             <IconMap size={14} /> 地図
           </button>
           <button
             className={mode === "camera" ? "is-active" : ""}
             title="風景（その場に立って見回す）"
-            onClick={() => mode === "map" && switchViewWithFade(() => enterCameraMode())}
+            onClick={() => mode === "map" && switchViewWithFade("camera", () => enterCameraMode())}
           >
             <IconLandscape size={14} /> 風景
           </button>
@@ -2316,8 +2320,20 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
 
-      {/* 地図↔風景の切替を隠す暗転フェード（最前面）。 */}
-      <div className={`view-fade${viewFade ? " is-on" : ""}`} style={{ opacity: viewFade }} aria-hidden="true" />
+      {/* 地図↔風景の切替を隠す暗転フェード（最前面）。暗転中は切替先カードを出す。 */}
+      <div className={`view-fade${viewFade ? " is-on" : ""}`} style={{ opacity: viewFade }} aria-hidden="true">
+        {fadeTarget && (
+          <div className="view-fade-card">
+            <span className="view-fade-ico">
+              {fadeTarget === "camera" ? <IconLandscape size={30} /> : <IconMap size={30} />}
+            </span>
+            <span className="view-fade-name">{fadeTarget === "camera" ? "風景" : "地図"}</span>
+            <span className="view-fade-sub">
+              {fadeTarget === "camera" ? "その場に立った眺め" : "上空からの俯瞰"}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* 写真オーバーレイ（カメラ視点でのみ。位置・サイズはループが写真枠に合わせる） */}
       {mode === "camera" && appMode !== "live" && photoUrl && (
