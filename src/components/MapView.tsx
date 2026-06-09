@@ -203,8 +203,13 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   const [mode, setMode] = useState<"map" | "camera">("map");
   // 地図↔風景の切替時、暗転で「カメラの飛び＋地形の作り直し」を隠す（0=透明 / 1=暗転）。
   const [viewFade, setViewFade] = useState(0);
-  // 暗転中に出す切替先カード（地図/風景、AR③④フェーズなどで共用）。
-  const [fadeCard, setFadeCard] = useState<{ icon: React.ReactNode; name: string; sub?: string } | null>(null);
+  // 暗転中の表示。種類で見た目を変える（モード開始=App側の大カード／ここは2種）:
+  //   view = 地図⇄風景の小チップ / phase = AR③⇄④のステップバー。読み込み中は出さない。
+  const [fadeInfo, setFadeInfo] = useState<
+    | { kind: "view"; icon: React.ReactNode; name: string }
+    | { kind: "phase"; step: number; name: string }
+    | null
+  >(null);
   const fadeBusyRef = useRef(false);
   const [camHeading, setCamHeading] = useState(0);
   const [camPitch, setCamPitch] = useState(0);
@@ -1414,17 +1419,20 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
   // 地図↔風景や AR③↔④ の「地図↔一人称」切替を暗転でつなぐ。暗転しきってから実際の切替
   // （カメラ移動＋地形再生成）を行い、地形が整うまで黒を保持してから明転する。暴れる瞬間が
   // 見えない。暗転中は切替先カードを出すので、長めの暗転でも「読み込み中」として自然。
-  const switchViewWithFade = (card: { icon: React.ReactNode; name: string; sub?: string }, doSwitch: () => void) => {
+  const switchViewWithFade = (
+    info: { kind: "view"; icon: React.ReactNode; name: string } | { kind: "phase"; step: number; name: string },
+    doSwitch: () => void,
+  ) => {
     if (fadeBusyRef.current) return;
     fadeBusyRef.current = true;
-    setFadeCard(card);
+    setFadeInfo(info);
     setViewFade(1); // 暗転（CSSトランジションで 0→1、350ms）
     window.setTimeout(() => {
       doSwitch(); // 暗転中に切替（カメラの飛び・地形リビルドを隠す）
       window.setTimeout(() => {
         setViewFade(0); // 明転（1→0、350ms）
         fadeBusyRef.current = false;
-        window.setTimeout(() => setFadeCard(null), 380); // 明転後にカードを片付け
+        window.setTimeout(() => setFadeInfo(null), 380); // 明転後に片付け
       }, 1300); // リビルド＆LODが落ち着くまで黒を保持（合計≒2秒）
     }, 350); // 暗転しきるまで
   };
@@ -1971,7 +1979,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             title="地図（俯瞰）"
             onClick={() =>
               mode === "camera" &&
-              switchViewWithFade({ icon: <IconMap size={30} />, name: "地図", sub: "上空からの俯瞰" }, exitCameraMode)
+              switchViewWithFade({ kind: "view", icon: <IconMap size={26} />, name: "地図" }, exitCameraMode)
             }
           >
             <IconMap size={14} /> 地図
@@ -1981,7 +1989,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
             title="風景（その場に立って見回す）"
             onClick={() =>
               mode === "map" &&
-              switchViewWithFade({ icon: <IconLandscape size={30} />, name: "風景", sub: "その場に立った眺め" }, () =>
+              switchViewWithFade({ kind: "view", icon: <IconLandscape size={26} />, name: "風景" }, () =>
                 enterCameraMode(),
               )
             }
@@ -2329,16 +2337,28 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
     <div className="mapview">
       <div className="mapview-canvas" ref={mountRef} />
 
-      {/* 地図↔風景・AR③↔④ の切替を隠す暗転フェード（最前面）。暗転中は切替先カードを出す。 */}
+      {/* 地図↔風景・AR③↔④ の切替を隠す暗転フェード（最前面）。種類で中身を変える。 */}
       <div className={`view-fade${viewFade ? " is-on" : ""}`} style={{ opacity: viewFade }} aria-hidden="true">
-        {fadeCard && (
-          <div className="view-fade-card">
-            <span className="view-fade-ico">{fadeCard.icon}</span>
-            <span className="view-fade-name">{fadeCard.name}</span>
-            {fadeCard.sub && <span className="view-fade-sub">{fadeCard.sub}</span>}
+        {/* ビュー切替（地図/風景）: セグメント調の小チップ。モード開始の大カードと区別。 */}
+        {fadeInfo?.kind === "view" && (
+          <div className="fade-pill">
+            <span className="fade-pill-ico">{fadeInfo.icon}</span>
+            <span className="fade-pill-name">{fadeInfo.name}</span>
           </div>
         )}
-        {fadeCard && <span className="fade-loading">読み込み中</span>}
+        {/* AR フェーズ移動: ①〜⑤のステップバーで現在を強調＝ウィザード進行と分かる。 */}
+        {fadeInfo?.kind === "phase" && (
+          <div className="fade-steps">
+            <div className="fade-steps-row">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <span key={n} className={`fade-step${n === fadeInfo.step ? " is-current" : ""}`}>
+                  {n}
+                </span>
+              ))}
+            </div>
+            <span className="fade-steps-name">{fadeInfo.name}</span>
+          </div>
+        )}
       </div>
 
       {/* 写真オーバーレイ（カメラ視点でのみ。位置・サイズはループが写真枠に合わせる） */}
@@ -2537,10 +2557,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                     title={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     aria-label={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     onClick={() =>
-                      switchViewWithFade(
-                        { icon: <IconCompass size={30} />, name: "微調整", sub: "山名を写真に合わせる" },
-                        goAlignFromSelect,
-                      )
+                      switchViewWithFade({ kind: "phase", step: 4, name: "微調整" }, goAlignFromSelect)
                     }
                   >
                     次へ
@@ -2803,9 +2820,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 className="ar-btn-sub ar-btn--icon"
                 title="山選択へ戻る"
                 aria-label="山選択へ戻る"
-                onClick={() =>
-                  switchViewWithFade({ icon: <IconMountain size={30} />, name: "山選択", sub: "写る山を選ぶ" }, backToSelect)
-                }
+                onClick={() => switchViewWithFade({ kind: "phase", step: 3, name: "山選択" }, backToSelect)}
               >
                 <IconChevron dir="left" size={18} />
               </button>
@@ -2821,9 +2836,7 @@ export default function MapView({ appMode, onHome }: MapViewProps) {
                 className="ar-btn-sub ar-btn--icon"
                 title="山選択へ戻る"
                 aria-label="山選択へ戻る"
-                onClick={() =>
-                  switchViewWithFade({ icon: <IconMountain size={30} />, name: "山選択", sub: "写る山を選ぶ" }, backToSelect)
-                }
+                onClick={() => switchViewWithFade({ kind: "phase", step: 3, name: "山選択" }, backToSelect)}
               >
                 <IconChevron dir="left" size={18} />
               </button>
