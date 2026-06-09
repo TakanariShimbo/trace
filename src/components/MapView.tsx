@@ -5,7 +5,7 @@ import { QuadtreeTerrain } from "../terrain/QuadtreeTerrain";
 import { CelestialLayer } from "../terrain/CelestialLayer";
 import { SkyDome } from "../terrain/SkyDome";
 import { PeakMarkers } from "../terrain/PeakMarkers";
-import { loadAllMountains } from "../lib/mountains";
+import { loadAllMountains, loadMountainDescriptions } from "../lib/mountains";
 import { computeSky, computeTrack, type SkyState, type SkyBody } from "../lib/celestial";
 import {
   IconMountain,
@@ -114,12 +114,15 @@ type ArStep = "upload" | "locate" | "params" | "align" | "select" | "export";
 
 // 出力(仕上げ)で編集する山ラベル。dot=点、label=名札。座標は写真フレーム内の正規化値(0..1)。
 type ArLabel = {
+  id: number;
   name: string;
   elevM: number;
   dotU: number;
   dotV: number;
   labelU: number;
   labelV: number;
+  description?: string; // 解説（Wikipedia）。下部キャプション・焼き込みに使う。
+  source?: string; // 出典URL（Wikipedia 記事）
 };
 
 export default function MapView({ appMode, onHome, settings }: MapViewProps) {
@@ -153,7 +156,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     setPeaksVisible: (on: boolean) => void;
     setPeaksData: (data: Awaited<ReturnType<typeof loadAllMountains>>) => void;
     clearPeakSelection: () => void;
-    getPeakSelection: () => { name: string; elevM: number; u: number; v: number }[]; // 書き出し用: 選択山の写真内正規化座標
+    getPeakSelection: () => { id: number; name: string; elevM: number; u: number; v: number }[]; // 書き出し用: 選択山の写真内正規化座標
     setControlMode: (mode: "map" | "aim" | "orbit") => void; // 地図操作: 通常 / 向き決め / 回転のみ
     // 地図(俯瞰)の2D(真上固定)/3D(傾け可)切替。center指定で撮影地点中心に寄せ、3Dはheading背後上空から見下ろす。
     setMapDimension: (dim: "2d" | "3d", center?: { lon: number; lat: number }, headingDeg?: number) => void;
@@ -227,6 +230,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [arFovDeg, setArFovDeg] = useState(CAM_FOV_DEFAULT); // 横画角（EXIF or ②で設定）
   // 出力(仕上げ)で編集する各山ラベル。座標は写真フレーム内の正規化値(0..1)。
   const [arLabels, setArLabels] = useState<ArLabel[]>([]);
+  // 下部キャプション（スクショ風の解説帯）で取り上げる山。arLabels内のindex。
+  const [captionIdx, setCaptionIdx] = useState(0);
+  // 解説キャプションを写真に焼き込むか（既定ON）。解説のある山が無ければ無効。
+  const [bakeCaption, setBakeCaption] = useState(true);
   const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
   const arLocRef = useRef<{ lat: number; lon: number } | null>(null); // 撮影地点（2D/3D切替の中心に使う）
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
@@ -773,11 +780,12 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       // 書き出し用: 選択中の山頂を写真フレーム内の正規化座標(u,v ∈ 0..1)で返す。
       // AR微調整中はカメラが写真アスペクトで投影しているため、NDC がそのまま写真の位置になる。
       getPeakSelection: () => {
-        const out: { name: string; elevM: number; u: number; v: number }[] = [];
+        const out: { id: number; name: string; elevM: number; u: number; v: number }[] = [];
         for (const i of peaks.selected) {
           projTmp.copy(peaks.worldPos(i)).project(camera);
           if (projTmp.z > 1) continue; // カメラ後方は除外
           out.push({
+            id: peaks.peakId(i),
             name: peaks.peakName(i),
             elevM: peaks.peakElev(i),
             u: projTmp.x * 0.5 + 0.5,
@@ -1202,6 +1210,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   useEffect(() => {
     showSkyRef.current = showSky;
   }, [showSky]);
+
+  // 写真ARの仕上げで使う山の解説(Wikipedia)を先読みしておく（出力遷移をもたつかせない）。
+  useEffect(() => {
+    if (appMode === "ar") void loadMountainDescriptions();
+  }, [appMode]);
 
   // 写真オーバーレイの blob URL をアンマウント時に解放（メモリリーク防止）。
   useEffect(() => {
@@ -1654,6 +1667,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     setArStep("select");
   };
   // 仕上げ(⑤)で編集した位置（arLabels）を写真に焼き込み、合成JPEGのデータURLを返す。
+  // キャプション用に解説を短く整える（長すぎると写真を覆うため。文末。で丸める）。
+  const shortDesc = (s?: string): string => {
+    if (!s) return "";
+    const max = 120;
+    if (s.length <= max) return s;
+    const cut = s.slice(0, max);
+    const p = cut.lastIndexOf("。");
+    return p > max * 0.5 ? cut.slice(0, p + 1) : cut + "…";
+  };
+
   const bakeComposite = async (): Promise<string | null> => {
     if (!photoUrl) return null;
     const img = new Image();
@@ -1706,21 +1729,76 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
       ctx.textAlign = "center";
       ctx.fillText(text, cx, cy + fs * 0.34);
     }
+
+    // 下部キャプション（スクショ風の解説帯）。山名＋標高＋解説＋出典(Wikipedia)を左下に焼く。
+    const cap = arLabels[captionIdx];
+    if (bakeCaption && cap?.description) {
+      const m = Math.round(W * 0.045); // 左右余白
+      const titleFs = Math.max(15, Math.round(H * 0.03));
+      const bodyFs = Math.max(12, Math.round(H * 0.022));
+      const srcFs = Math.max(10, Math.round(H * 0.015));
+      const titleLineH = Math.round(titleFs * 1.35);
+      const lineH = Math.round(bodyFs * 1.5);
+      const srcLineH = Math.round(srcFs * 1.9);
+      const pv = Math.round(bodyFs * 0.9); // 上下パディング
+      const textW = W - m * 2;
+      // 本文を文字単位で折り返し（日本語は単語境界が無いため）
+      ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+      ctx.textAlign = "left";
+      const lines: string[] = [];
+      let cur = "";
+      for (const ch of shortDesc(cap.description)) {
+        if (ch === "\n") { lines.push(cur); cur = ""; continue; }
+        if (cur && ctx.measureText(cur + ch).width > textW) { lines.push(cur); cur = ch; }
+        else cur += ch;
+      }
+      if (cur) lines.push(cur);
+      const bandH = pv * 2 + titleLineH + lines.length * lineH + srcLineH;
+      const bandTop = H - bandH;
+      // 背景グラデ（下ほど濃く＝文字が読める）
+      const grad = ctx.createLinearGradient(0, bandTop, 0, H);
+      grad.addColorStop(0, "rgba(0,0,0,0)");
+      grad.addColorStop(0.3, "rgba(0,0,0,0.5)");
+      grad.addColorStop(1, "rgba(0,0,0,0.8)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, bandTop, W, bandH);
+      let top = bandTop + pv;
+      ctx.fillStyle = "#fff";
+      ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
+      ctx.fillText(`${cap.name}  ${Math.round(cap.elevM)}m`, m, top + titleFs);
+      top += titleLineH;
+      ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+      ctx.fillStyle = "rgba(255,255,255,0.94)";
+      for (const ln of lines) { ctx.fillText(ln, m, top + bodyFs); top += lineH; }
+      ctx.fillStyle = "rgba(255,255,255,0.62)";
+      ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
+      ctx.fillText("出典: Wikipedia（CC BY-SA）", m, top + srcFs);
+    }
     return canvas.toDataURL("image/jpeg", 0.92);
   };
   // 微調整(④)→ 仕上げ(⑤)。選択山を写真フレーム内の正規化座標で取り、編集用に展開。
-  const goExport = () => {
+  // 解説(Wikipedia)を id で引き当て、下部キャプション・焼き込み用にラベルへ付与する。
+  const goExport = async () => {
     const sel = apiRef.current?.getPeakSelection() ?? [];
-    const labels: ArLabel[] = sel
-      .filter((p) => p.u >= 0 && p.u <= 1 && p.v >= 0 && p.v <= 1) // 写真枠内のみ
-      .map((p) => ({
+    const inFrame = sel.filter((p) => p.u >= 0 && p.u <= 1 && p.v >= 0 && p.v <= 1); // 写真枠内のみ
+    const descMap = await loadMountainDescriptions();
+    const labels: ArLabel[] = inFrame.map((p) => {
+      const d = descMap.get(p.id);
+      return {
+        id: p.id,
         name: p.name,
         elevM: p.elevM,
         dotU: p.u,
         dotV: p.v,
         labelU: p.u,
         labelV: Math.max(0.06, p.v - 0.12), // 名札は点の少し上を初期位置に
-      }));
+        description: d?.extract,
+        source: d?.url,
+      };
+    });
+    // キャプションは解説のある山を既定で取り上げる（なければ先頭）。
+    const firstWithDesc = labels.findIndex((l) => l.description);
+    setCaptionIdx(firstWithDesc >= 0 ? firstWithDesc : 0);
     setArLabels(labels);
     setArStep("export");
   };
@@ -2572,6 +2650,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 </div>
               </div>
             ))}
+            {/* 下部キャプション（スクショ風の解説帯）。焼き込みONのときだけ写真に乗る位置を示す。 */}
+            {bakeCaption && arLabels[captionIdx]?.description && (
+              <div className="ar-caption" aria-hidden="true">
+                <div className="ar-caption-title">
+                  {arLabels[captionIdx].name}
+                  <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
+                </div>
+                <p className="ar-caption-text">{shortDesc(arLabels[captionIdx].description)}</p>
+                <div className="ar-caption-src">出典: Wikipedia（CC BY-SA）</div>
+              </div>
+            )}
           </div>
           <div
             className="cam-hud"
@@ -2600,6 +2689,35 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
                 )}
                 <div className="stage-controls">{stageZoomControls}</div>
+                {/* 解説キャプション（Wikipedia）の焼き込み設定。解説のある山が選ばれている時だけ出す。 */}
+                {arLabels.some((l) => l.description) && (
+                  <div className="ar-caption-ctrl">
+                    <label className="switch-row">
+                      <span>写真に解説を入れる</span>
+                      <input
+                        type="checkbox"
+                        className="switch"
+                        checked={bakeCaption}
+                        onChange={(e) => setBakeCaption(e.target.checked)}
+                      />
+                    </label>
+                    {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
+                      <div className="ar-caption-pick">
+                        {arLabels.map((l, i) =>
+                          l.description ? (
+                            <button
+                              key={i}
+                              className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
+                              onClick={() => setCaptionIdx(i)}
+                            >
+                              {l.name}
+                            </button>
+                          ) : null,
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="ar-dock-actions">
                   <button
                     className="ar-btn-sub ar-btn--icon"

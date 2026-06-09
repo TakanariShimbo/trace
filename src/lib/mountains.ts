@@ -3,6 +3,7 @@
 //   出典: 「日本の主な山岳標高一覧」（国土地理院）を加工。
 
 type MountainRecord = {
+  id: number;
   name: string;
   name_kana?: string;
   latitude: number;
@@ -13,6 +14,7 @@ type MountainRecord = {
 };
 
 export type MountainHit = {
+  id: number;
   name: string;
   lat: number;
   lon: number;
@@ -20,8 +22,17 @@ export type MountainHit = {
   prefecture?: string;
 };
 
+// 山の解説（Wikipedia 日本語版より。CC BY-SA 4.0）。id で引く。本体が重いのでARなどで遅延ロード。
+export type MountainDescription = {
+  title: string; // Wikipedia 記事タイトル
+  extract: string; // 冒頭抜粋
+  url: string; // 出典記事URL
+};
+
 let cache: MountainRecord[] | null = null;
 let loading: Promise<MountainRecord[]> | null = null;
+let descCache: Map<number, MountainDescription> | null = null;
+let descLoading: Promise<Map<number, MountainDescription>> | null = null;
 
 function load(): Promise<MountainRecord[]> {
   if (cache) return Promise.resolve(cache);
@@ -50,12 +61,35 @@ function toHiragana(s: string): string {
 export async function loadAllMountains(): Promise<MountainHit[]> {
   const list = await load();
   return list.map((m) => ({
+    id: m.id,
     name: m.name,
     lat: m.latitude,
     lon: m.longitude,
     elevationM: m.elevation_m,
     prefecture: m.prefecture,
   }));
+}
+
+/** 山の解説（id→解説）を読み込む。本体が重いので必要時（写真ARなど）に遅延ロードしてキャッシュ。 */
+export async function loadMountainDescriptions(): Promise<Map<number, MountainDescription>> {
+  if (descCache) return descCache;
+  if (descLoading) return descLoading;
+  const url = `${import.meta.env.BASE_URL}data/mountain_descriptions.json`;
+  descLoading = fetch(url)
+    .then((r) => (r.ok ? r.json() : { descriptions: {} }))
+    .then((d: { descriptions?: Record<string, MountainDescription> }) => {
+      const map = new Map<number, MountainDescription>();
+      for (const [id, v] of Object.entries(d.descriptions ?? {})) {
+        if (v?.extract) map.set(Number(id), { title: v.title, extract: v.extract, url: v.url });
+      }
+      descCache = map;
+      return map;
+    })
+    .catch(() => {
+      descLoading = null;
+      return new Map<number, MountainDescription>();
+    });
+  return descLoading;
 }
 
 /** 名前・読みで部分一致。重要度(priority)→標高の順で並べ、上位 limit 件を返す。 */
@@ -70,6 +104,7 @@ export async function searchMountains(query: string, limit = 12): Promise<Mounta
   });
   hits.sort((a, b) => b.priority - a.priority || b.elevation_m - a.elevation_m);
   return hits.slice(0, limit).map((m) => ({
+    id: m.id,
     name: m.name,
     lat: m.latitude,
     lon: m.longitude,

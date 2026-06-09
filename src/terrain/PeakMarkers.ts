@@ -91,6 +91,11 @@ export class PeakMarkers {
     return this.peaks[i]?.name ?? "";
   }
 
+  /** 山頂 i の山ID（mountains.json の id）。解説の引き当てに使う。 */
+  peakId(i: number): number {
+    return this.peaks[i]?.id ?? -1;
+  }
+
   /** 山頂 i の標高(m)。書き出しのラベル「山名＋標高」に使う。 */
   peakElev(i: number): number {
     return this.elevM[i] ?? 0;
