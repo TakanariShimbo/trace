@@ -1793,15 +1793,13 @@ body,
   border-radius: 1cqmax;
   pointer-events: none;
 }
-/* 4辺のリサイズハンドル（丸・アクセント縁・半透明影）。 */
+/* 4辺のリサイズハンドル（枠線と同色の半透明ドット・小さめ）。 */
 .ar-cap-handle {
   position: absolute;
-  width: clamp(11px, 2.6cqmax, 20px);
-  height: clamp(11px, 2.6cqmax, 20px);
-  background: rgba(255, 255, 255, 0.95);
-  border: 0.5cqmax solid rgba(95, 160, 235, 0.95);
+  width: clamp(9px, 2cqmax, 15px);
+  height: clamp(9px, 2cqmax, 15px);
+  background: rgba(143, 194, 255, 0.6);
   border-radius: 50%;
-  box-shadow: 0 0.2cqmax 0.55cqmax rgba(0, 0, 0, 0.5);
   touch-action: none;
   z-index: 3;
 }
@@ -1857,12 +1855,10 @@ body,
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: clamp(10px, 2.2cqmax, 18px);
-  height: clamp(10px, 2.2cqmax, 18px);
-  background: rgba(255, 255, 255, 0.92);
-  border: 0.45cqmax solid rgba(95, 160, 235, 0.9);
+  width: clamp(9px, 2cqmax, 15px);
+  height: clamp(9px, 2cqmax, 15px);
+  background: rgba(143, 194, 255, 0.6);
   border-radius: 50%;
-  box-shadow: 0 0.2cqmax 0.5cqmax rgba(0, 0, 0, 0.45);
 }
 .ar-caption-title {
   font-size: calc(2.6cqmax * var(--ar-fs, 1)); /* 写真長辺の 2.6% × 倍率 */
