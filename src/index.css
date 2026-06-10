@@ -1770,46 +1770,99 @@ body,
 .ar-caption:active {
   cursor: grabbing;
 }
-/* 「画像」モード中は注釈（名札・点・解説）を透過させ、写真のパン/ズームを優先。 */
+/* 「画像」モード中は注釈（名札・点・解説）を透過させ、写真のパン/ズームを優先。編集UIも隠す。 */
 .ar-edit-stage.is-image-mode .ar-edit-label,
 .ar-edit-stage.is-image-mode .ar-edit-dot,
 .ar-edit-stage.is-image-mode .ar-caption {
   pointer-events: none;
 }
-.ar-edit-stage.is-image-mode .ar-cap-handle {
+.ar-edit-stage.is-image-mode .ar-cap-handle,
+.ar-edit-stage.is-image-mode .ar-caption::before,
+.ar-edit-stage.is-image-mode .ar-cap-divider::before {
   display: none;
 }
-/* 解説ブロックのリサイズハンドル（パワポ図形風）。右=横幅、下=縦に伸ばす。 */
+.ar-edit-stage.is-image-mode .ar-cap-divider {
+  background: transparent;
+}
+/* 選択枠（解説ブロックを囲む角丸の線）。編集UIのみ・出力には焼き込まれない。 */
+.ar-caption::before {
+  content: "";
+  position: absolute;
+  inset: -1cqmax;
+  border: 0.2cqmax solid rgba(143, 194, 255, 0.6);
+  border-radius: 1cqmax;
+  pointer-events: none;
+}
+/* 4辺のリサイズハンドル（丸・アクセント縁・半透明影）。 */
 .ar-cap-handle {
   position: absolute;
-  width: 18px;
-  height: 18px;
-  background: #fff;
-  border: 2px solid #4f86c6;
-  border-radius: 3px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  width: clamp(11px, 2.6cqmax, 20px);
+  height: clamp(11px, 2.6cqmax, 20px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 0.5cqmax solid rgba(95, 160, 235, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0.2cqmax 0.55cqmax rgba(0, 0, 0, 0.5);
   touch-action: none;
-  z-index: 2;
+  z-index: 3;
 }
-.ar-cap-handle--x {
-  right: -9px;
+.ar-cap-handle--l {
+  left: -1cqmax;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   cursor: ew-resize;
 }
-.ar-cap-handle--y {
-  bottom: -9px;
+.ar-cap-handle--r {
+  right: -1cqmax;
+  top: 50%;
+  transform: translate(50%, -50%);
+  cursor: ew-resize;
+}
+.ar-cap-handle--t {
+  top: -1cqmax;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
+  cursor: ns-resize;
+}
+.ar-cap-handle--b {
+  bottom: -1cqmax;
+  left: 50%;
+  transform: translate(-50%, 50%);
   cursor: ns-resize;
 }
 .ar-cap-cols {
   display: flex;
-  gap: 3.5%;
+  gap: 0;
 }
 .ar-cap-col {
   flex: 1;
   min-width: 0;
+}
+/* 日英の区切り線（ドラッグで分割比を変える）。中央に丸グリップ。 */
+.ar-cap-divider {
+  position: relative;
+  flex: 0 0 auto;
+  width: 0.3cqmax;
+  min-width: 1px;
+  margin: 0 1.7%; /* 焼き込みの colGap(≈3.5%) と一致 */
+  align-self: stretch;
+  background: rgba(143, 194, 255, 0.55);
+  border-radius: 1px;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.ar-cap-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(10px, 2.2cqmax, 18px);
+  height: clamp(10px, 2.2cqmax, 18px);
+  background: rgba(255, 255, 255, 0.92);
+  border: 0.45cqmax solid rgba(95, 160, 235, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0.2cqmax 0.5cqmax rgba(0, 0, 0, 0.45);
 }
 .ar-caption-title {
   font-size: calc(2.6cqmax * var(--ar-fs, 1)); /* 写真長辺の 2.6% × 倍率 */

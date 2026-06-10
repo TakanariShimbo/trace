@@ -239,9 +239,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const bakeCaption = captionLang !== "none"; // 解説を焼き込むか
   // 仕上げ(⑤)の操作モード: image=写真をパン/ズーム / edit=ラベル・解説を移動。誤操作を防ぐ。
   const [arExportMode, setArExportMode] = useState<"image" | "edit">("edit");
-  // 解説ブロックの幅（写真幅に対する割合）。端のハンドルを引いてアスペクト比を調整（文字サイズは固定）。
+  // 解説ブロックの幅（写真幅に対する割合）。4辺のハンドルでアスペクト比を調整（文字サイズは固定）。
   const [captionW, setCaptionW] = useState(0.55);
-  const capResizeRef = useRef<{ axis: "x" | "y"; startW: number; startU: number; startV: number } | null>(null);
+  const capResizeRef = useRef<{
+    side: "l" | "r" | "t" | "b";
+    startW: number;
+    startV: number;
+    boxLeft: number;
+    boxRight: number;
+  } | null>(null);
+  // 両方表示のときの日英の分割比（左=日本語の割合）。間の線をドラッグで調整。
+  const [captionSplit, setCaptionSplit] = useState(0.5);
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 解説・ラベル共通の文字サイズ倍率（小0.8 / 中1.0 / 大1.25）。
@@ -264,7 +272,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
   const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" | "capResize" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "caption" | "capResize" | "capSplit" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -1755,16 +1763,21 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const lineH = Math.round(bodyFs * 1.5);
         const blockW = Math.round(W * captionW);
         const colGap = Math.round(W * 0.035);
-        const colW = cols.length > 1 ? Math.round((blockW - colGap) / 2) : blockW;
+        // 両方のときは captionSplit（左=日本語の割合）で各カラム幅を決める。
+        const colWidths =
+          cols.length > 1
+            ? [Math.round((blockW - colGap) * captionSplit), blockW - colGap - Math.round((blockW - colGap) * captionSplit)]
+            : [blockW];
         ctx.textAlign = "left";
-        // 各カラムの本文を折り返し
-        const wrapped = cols.map((c) => {
+        // 各カラムの本文を折り返し（カラム幅で）
+        const wrapped = cols.map((c, ci) => {
+          const w = colWidths[ci];
           ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
           const lines: string[] = [];
           let curL = "";
           for (const ch of c.body) {
             if (ch === "\n") { lines.push(curL); curL = ""; continue; }
-            if (curL && ctx.measureText(curL + ch).width > colW) { lines.push(curL); curL = ch; }
+            if (curL && ctx.measureText(curL + ch).width > w) { lines.push(curL); curL = ch; }
             else curL += ch;
           }
           if (curL) lines.push(curL);
@@ -1780,7 +1793,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.shadowBlur = Math.round(L * 0.006);
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
         wrapped.forEach((w, ci) => {
-          const cx = bx + ci * (colW + colGap);
+          const cx = bx + (ci === 0 ? 0 : colWidths[0] + colGap);
           let ty = by;
           ctx.fillStyle = "#fff";
           ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
@@ -1862,21 +1875,36 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     }
     arDragRef.current = { i: -1, kind: "caption" };
   };
-  // 解説ブロックのリサイズ（端のハンドル）。x=横ハンドル(右へ=幅広→行数減)、y=縦ハンドル(下へ=幅狭→行数増)。
+  // 解説ブロックのリサイズ（4辺のハンドル）。右/左=幅、上/下=縦に伸ばすと幅が狭まる。文字サイズは固定。
   const onCapResizeDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const el = e.currentTarget as HTMLElement;
     el.setPointerCapture?.(e.pointerId);
-    const axis: "x" | "y" = el.classList.contains("ar-cap-handle--y") ? "y" : "x";
+    const cl = el.classList;
+    const side: "l" | "r" | "t" | "b" = cl.contains("ar-cap-handle--l")
+      ? "l"
+      : cl.contains("ar-cap-handle--t")
+        ? "t"
+        : cl.contains("ar-cap-handle--b")
+          ? "b"
+          : "r";
     const r = arEditStageRef.current?.getBoundingClientRect();
     capResizeRef.current = {
-      axis,
+      side,
       startW: captionW,
-      startU: r ? (e.clientX - r.left) / r.width : 0,
       startV: r ? (e.clientY - r.top) / r.height : 0,
+      boxLeft: captionPos.u,
+      boxRight: captionPos.u + captionW,
     };
     arDragRef.current = { i: -1, kind: "capResize" };
+  };
+  // 両方表示の日英区切り線のドラッグ。左=日本語の割合(captionSplit)を変える。
+  const onCapSplitDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    arDragRef.current = { i: -1, kind: "capSplit" };
   };
   // 仕上げ画面: 写真の余白部分をドラッグ＝写真+3Dビューをパン（「画像」モードのみ）。
   const onStagePanDown = (e: React.PointerEvent) => {
@@ -1923,10 +1951,27 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     if (d.kind === "capResize") {
       const rz = capResizeRef.current;
       if (!rz) return;
-      // x: 右へ引く=幅広（行数減）。y: 下へ引く=幅狭（行数増）。文字サイズは変えない。
-      const next = rz.axis === "x" ? rz.startW + (u - rz.startU) : rz.startW - (v - rz.startV) * 1.4;
-      const maxW = Math.max(0.25, 1 - captionPos.u); // フレーム右端を超えない
-      setCaptionW(Math.min(maxW, Math.max(0.25, next)));
+      const MINW = 0.22;
+      if (rz.side === "r") {
+        setCaptionW(Math.min(1 - rz.boxLeft, Math.max(MINW, u - rz.boxLeft)));
+      } else if (rz.side === "l") {
+        const newLeft = Math.min(rz.boxRight - MINW, Math.max(0, u));
+        setCaptionPos((p) => ({ ...p, u: newLeft }));
+        setCaptionW(rz.boxRight - newLeft);
+      } else if (rz.side === "b") {
+        // 下へ引く=縦に伸びる=幅が狭まる（行数増）。上端は固定。
+        setCaptionW(Math.min(1 - rz.boxLeft, Math.max(MINW, rz.startW - (v - rz.startV) * 1.4)));
+      } else {
+        // top: 上端が指に追従しつつ、上へ引くほど幅が狭まる（縦に伸びる）。
+        const newTop = Math.min(0.9, Math.max(0, v));
+        setCaptionPos((p) => ({ ...p, v: newTop }));
+        setCaptionW(Math.min(1 - rz.boxLeft, Math.max(MINW, rz.startW - (rz.startV - v) * 1.4)));
+      }
+      return;
+    }
+    if (d.kind === "capSplit") {
+      // 日英の境界。左=日本語の割合。
+      setCaptionSplit(Math.min(0.8, Math.max(0.2, (u - captionPos.u) / Math.max(0.001, captionW))));
       return;
     }
     setArLabels((prev) =>
@@ -2766,7 +2811,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 >
                   <div className="ar-cap-cols">
                     {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
-                      <div className="ar-cap-col">
+                      <div
+                        className="ar-cap-col"
+                        style={captionLang === "both" ? { flex: `${captionSplit} 1 0` } : undefined}
+                      >
                         <div className="ar-caption-title">
                           {arLabels[captionIdx].name}
                           <b>{Math.round(arLabels[captionIdx].elevM)}m</b>
@@ -2774,8 +2822,20 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         <p className="ar-caption-text">{arLabels[captionIdx].description}</p>
                       </div>
                     )}
+                    {captionLang === "both" && arLabels[captionIdx].description && arLabels[captionIdx].descriptionEn && (
+                      <div
+                        className="ar-cap-divider"
+                        title="日英の境界を動かす"
+                        onPointerDown={onCapSplitDown}
+                        onPointerMove={onEditMove}
+                        onPointerUp={onEditUp}
+                      />
+                    )}
                     {(captionLang === "en" || captionLang === "both") && arLabels[captionIdx].descriptionEn && (
-                      <div className="ar-cap-col">
+                      <div
+                        className="ar-cap-col"
+                        style={captionLang === "both" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
+                      >
                         <div className="ar-caption-title">
                           {arLabels[captionIdx].nameEn || arLabels[captionIdx].name}
                           <b>{Math.round(arLabels[captionIdx].elevM)} m</b>
@@ -2789,21 +2849,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       ? "Auto-generated from facts (ref: Wikipedia et al.)"
                       : "解説は事実をもとに自動生成（参考: Wikipedia ほか）"}
                   </div>
-                  {/* リサイズハンドル（右＝横幅 / 下＝縦に伸ばすと幅が狭まる）。文字サイズは固定。 */}
-                  <span
-                    className="ar-cap-handle ar-cap-handle--x"
-                    title="幅を変える"
-                    onPointerDown={onCapResizeDown}
-                    onPointerMove={onEditMove}
-                    onPointerUp={onEditUp}
-                  />
-                  <span
-                    className="ar-cap-handle ar-cap-handle--y"
-                    title="縦に伸ばす（幅が狭まる）"
-                    onPointerDown={onCapResizeDown}
-                    onPointerMove={onEditMove}
-                    onPointerUp={onEditUp}
-                  />
+                  {/* 4辺のリサイズハンドル。左右=横幅 / 上下=縦に伸ばすと幅が狭まる。文字サイズは固定。出力には出ない。 */}
+                  {(["l", "r", "t", "b"] as const).map((s) => (
+                    <span
+                      key={s}
+                      className={`ar-cap-handle ar-cap-handle--${s}`}
+                      title={s === "l" || s === "r" ? "幅を変える" : "縦に伸ばす（幅が狭まる）"}
+                      onPointerDown={onCapResizeDown}
+                      onPointerMove={onEditMove}
+                      onPointerUp={onEditUp}
+                    />
+                  ))}
                 </div>
               )}
           </div>
