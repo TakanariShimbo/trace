@@ -1755,6 +1755,15 @@ body,
 .ar-edit-label:active {
   cursor: grabbing;
 }
+/* ラベルの選択枠（解説と同じ青枠）。編集UIのみ・出力には焼き込まれない。 */
+.ar-edit-label::before {
+  content: "";
+  position: absolute;
+  inset: -0.8cqmax -1.2cqmax;
+  border: 0.2cqmax solid rgba(143, 194, 255, 0.6);
+  border-radius: 0.8cqmax;
+  pointer-events: none;
+}
 .ar-label-name {
   font-size: calc(2.7cqmax * var(--label-fs, 1));
   font-weight: 700;
@@ -1790,6 +1799,8 @@ body,
 }
 .ar-edit-stage.is-image-mode .ar-cap-handle,
 .ar-edit-stage.is-image-mode .ar-caption::before,
+.ar-edit-stage.is-image-mode .ar-edit-label::before,
+.ar-edit-stage.is-image-mode .ar-edit-guide,
 .ar-edit-stage.is-image-mode .ar-cap-divider::before {
   display: none;
 }

@@ -2767,21 +2767,33 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               <>
                 <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {arLabels.map((lb, i) => {
-                    // 両端は描かず、点と点の中心66%だけ実線（17%ずつ余白）。
                     const ax = lb.labelU * 100, ay = lb.labelV * 100;
                     const bx = lb.dotU * 100, by = lb.dotV * 100;
                     return (
-                      <line
-                        key={i}
-                        x1={ax + (bx - ax) * 0.17}
-                        y1={ay + (by - ay) * 0.17}
-                        x2={ax + (bx - ax) * 0.83}
-                        y2={ay + (by - ay) * 0.83}
-                        stroke={labelColor}
-                        strokeOpacity={0.9}
-                        strokeWidth={1.2}
-                        vectorEffect="non-scaling-stroke"
-                      />
+                      <g key={i}>
+                        {/* 青の編集ガイド線（点⇔点を余白なしで結ぶ・出力には焼かない） */}
+                        <line
+                          className="ar-edit-guide"
+                          x1={ax}
+                          y1={ay}
+                          x2={bx}
+                          y2={by}
+                          stroke="rgba(143,194,255,0.6)"
+                          strokeWidth={1.2}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                        {/* 出力されるリード線（文字色・中心66%だけ実線、両端17%は余白） */}
+                        <line
+                          x1={ax + (bx - ax) * 0.17}
+                          y1={ay + (by - ay) * 0.17}
+                          x2={ax + (bx - ax) * 0.83}
+                          y2={ay + (by - ay) * 0.83}
+                          stroke={labelColor}
+                          strokeOpacity={0.9}
+                          strokeWidth={1.2}
+                          vectorEffect="non-scaling-stroke"
+                        />
+                      </g>
                     );
                   })}
                 </svg>
