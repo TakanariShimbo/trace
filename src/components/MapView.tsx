@@ -2765,75 +2765,86 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             {/* 山名ラベル（表示ONのときだけ。引き出し線＋点＋名札） */}
             {bakeLabels && (
               <>
+                {/* 出力されるリード線（文字色・中心66%だけ実線、両端17%は余白）。焼き込みのプレビュー。 */}
                 <svg className="ar-edit-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
                   {arLabels.map((lb, i) => {
                     const ax = lb.labelU * 100, ay = lb.labelV * 100;
                     const bx = lb.dotU * 100, by = lb.dotV * 100;
                     return (
-                      <g key={i}>
-                        {/* 青の編集ガイド線（点⇔点を余白なしで結ぶ・出力には焼かない） */}
-                        <line
-                          className="ar-edit-guide"
-                          x1={ax}
-                          y1={ay}
-                          x2={bx}
-                          y2={by}
-                          stroke="rgba(143,194,255,0.6)"
-                          strokeWidth={1.2}
-                          vectorEffect="non-scaling-stroke"
-                        />
-                        {/* 出力されるリード線（文字色・中心66%だけ実線、両端17%は余白） */}
-                        <line
-                          x1={ax + (bx - ax) * 0.17}
-                          y1={ay + (by - ay) * 0.17}
-                          x2={ax + (bx - ax) * 0.83}
-                          y2={ay + (by - ay) * 0.83}
-                          stroke={labelColor}
-                          strokeOpacity={0.9}
-                          strokeWidth={1.2}
-                          vectorEffect="non-scaling-stroke"
-                        />
-                      </g>
+                      <line
+                        key={i}
+                        x1={ax + (bx - ax) * 0.17}
+                        y1={ay + (by - ay) * 0.17}
+                        x2={ax + (bx - ax) * 0.83}
+                        y2={ay + (by - ay) * 0.83}
+                        stroke={labelColor}
+                        strokeOpacity={0.9}
+                        strokeWidth={1.2}
+                        vectorEffect="non-scaling-stroke"
+                      />
                     );
                   })}
                 </svg>
-                {arLabels.map((lb, i) => (
-                  <div key={i}>
-                    <div
-                      className="ar-edit-dot"
-                      style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
-                      onPointerDown={onEditDown(i, "dot")}
-                      onPointerMove={onEditMove}
-                      onPointerUp={onEditUp}
-                    />
-                    {/* ラベル側のアンカー点（青の半透明・ラベルを動かす） */}
-                    <div
-                      className="ar-edit-dot"
-                      style={{ left: `${lb.labelU * 100}%`, top: `${lb.labelV * 100}%` }}
-                      onPointerDown={onEditDown(i, "label")}
-                      onPointerMove={onEditMove}
-                      onPointerUp={onEditUp}
-                    />
-                    <div
-                      className="ar-edit-label"
-                      style={
-                        {
-                          left: `${lb.labelU * 100}%`,
-                          top: `${lb.labelV * 100}%`,
-                          color: labelColor,
-                          "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)",
-                        } as React.CSSProperties
-                      }
-                      onPointerDown={onEditDown(i, "label")}
-                      onPointerMove={onEditMove}
-                      onPointerUp={onEditUp}
-                    >
-                      <span className="ar-label-name">{lb.name}</span>
-                      <span className="ar-label-sub">
-                        {lb.nameEn ? `${lb.nameEn} | ` : ""}
-                        {Math.round(lb.elevM).toLocaleString()}m
-                      </span>
+                {/* 青の編集UI（ガイド線＋点）。各要素は不透明にし、この層に一度だけ不透明度を掛ける＝
+                    同じ層内で重なっても合成は1回きりなので色が濃くならない。出力には焼き込まない。 */}
+                <div className="ar-edit-chrome">
+                  <svg className="ar-edit-guides" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    {arLabels.map((lb, i) => (
+                      <line
+                        key={i}
+                        x1={lb.labelU * 100}
+                        y1={lb.labelV * 100}
+                        x2={lb.dotU * 100}
+                        y2={lb.dotV * 100}
+                        stroke="rgb(143,194,255)"
+                        strokeWidth={1.2}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                  </svg>
+                  {arLabels.map((lb, i) => (
+                    <div key={i}>
+                      {/* 山頂側のアンカー点 */}
+                      <div
+                        className="ar-edit-dot"
+                        style={{ left: `${lb.dotU * 100}%`, top: `${lb.dotV * 100}%` }}
+                        onPointerDown={onEditDown(i, "dot")}
+                        onPointerMove={onEditMove}
+                        onPointerUp={onEditUp}
+                      />
+                      {/* ラベル側のアンカー点（ドラッグでラベル移動） */}
+                      <div
+                        className="ar-edit-dot"
+                        style={{ left: `${lb.labelU * 100}%`, top: `${lb.labelV * 100}%` }}
+                        onPointerDown={onEditDown(i, "label")}
+                        onPointerMove={onEditMove}
+                        onPointerUp={onEditUp}
+                      />
                     </div>
+                  ))}
+                </div>
+                {/* ラベル本体（文字・全不透明） */}
+                {arLabels.map((lb, i) => (
+                  <div
+                    key={i}
+                    className="ar-edit-label"
+                    style={
+                      {
+                        left: `${lb.labelU * 100}%`,
+                        top: `${lb.labelV * 100}%`,
+                        color: labelColor,
+                        "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)",
+                      } as React.CSSProperties
+                    }
+                    onPointerDown={onEditDown(i, "label")}
+                    onPointerMove={onEditMove}
+                    onPointerUp={onEditUp}
+                  >
+                    <span className="ar-label-name">{lb.name}</span>
+                    <span className="ar-label-sub">
+                      {lb.nameEn ? `${lb.nameEn} | ` : ""}
+                      {Math.round(lb.elevM).toLocaleString()}m
+                    </span>
                   </div>
                 ))}
               </>
