@@ -286,25 +286,29 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [captionLayout, setCaptionLayout] = useState<"horizontal" | "vertical">("horizontal");
   // 両方表示のときの見出し（タイトル）の出し方。
   //  each   … 各本文の上にその言語の見出し（現状）
-  //  stack  … 日英の見出しを上にまとめて2行→その下に両本文
-  //  single … 日本語の見出しだけを上に→その下に両本文
-  //  slash  … 「日 / 英」を1行にまとめて上に→その下に両本文
-  const [captionTitleMode, setCaptionTitleMode] = useState<"each" | "stack" | "single" | "slash">("each");
+  //  groupV … 日英の見出しを上下にまとめる（上=日が大きめ、下=英が小さめ）→その下に両本文
+  //  groupH … 日英の見出しを左右にまとめる（左=日が大きめ、右=英が小さめ）→その下に両本文
+  //  ja     … 日本語の見出しだけを上に→その下に両本文
+  //  en     … 英語の見出しだけを上に→その下に両本文
+  const [captionTitleMode, setCaptionTitleMode] = useState<"each" | "groupV" | "groupH" | "ja" | "en">("each");
   // 解説プレビュー用の派生値（両方表示時の見出し構成）。焼き込み側のロジックと一致させる。
   const capItem = arLabels[captionIdx];
   const capBoth = captionLang === "both" && !!capItem?.description && !!capItem?.descriptionEn;
   const capName = capItem?.name ?? "";
   const capNameEn = capItem?.nameEn || capItem?.name || "";
-  // 共有見出し（both かつ each 以外）。それ以外は各本文に自前の見出しを付ける。
-  const capSharedTitles: string[] =
-    capBoth && captionTitleMode !== "each"
-      ? captionTitleMode === "stack"
-        ? [capName, capNameEn]
-        : captionTitleMode === "single"
-          ? [capName]
-          : [`${capName} / ${capNameEn}`] // slash
-      : [];
+  // 各本文に自前の見出しを付けるか（本文ごと、または単一言語のとき）。
   const capColHasTitle = !capBoth || captionTitleMode === "each";
+  // 共有見出しの構成（両方かつ each 以外）。sub=true は小さめ表示。row=左右並び。
+  const capSharedTitleParts: { text: string; sub: boolean }[] = !capBoth
+    ? []
+    : captionTitleMode === "ja"
+      ? [{ text: capName, sub: false }]
+      : captionTitleMode === "en"
+        ? [{ text: capNameEn, sub: false }]
+        : captionTitleMode === "groupV" || captionTitleMode === "groupH"
+          ? [{ text: capName, sub: false }, { text: capNameEn, sub: true }]
+          : []; // each
+  const capSharedRow = captionTitleMode === "groupH";
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 文字サイズ倍率（スライダーで連続調整）。役割ごとに独立。初期値はすべて 1.0。
@@ -1917,20 +1921,30 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           return { title: c.title, lines: wrapBody(c.body, colWidths[ci]) };
         });
         const both = cols.length > 1;
-        // 共有見出し（both かつ each 以外）。each や単一言語は各カラムに見出しを付ける。
-        const sharedTitles: string[] =
-          both && captionTitleMode !== "each"
-            ? captionTitleMode === "stack"
-              ? [cols[0].title, cols[1].title]
-              : captionTitleMode === "single"
-                ? [cols[0].title]
-                : [`${cols[0].title} / ${cols[1].title}`] // slash
-            : [];
+        const titleFsSmall = Math.round(titleFs * 0.6); // まとめ表示の従（英）サイズ
+        const lineHFor = (fs: number) => Math.round(fs * 1.3);
+        // 共有見出し（both かつ each 以外）。fs で大小、sharedRow で左右並び。
+        // each・単一言語は各カラムに自前の見出しを付ける。
+        const sharedParts: { text: string; fs: number }[] = !both
+          ? []
+          : captionTitleMode === "ja"
+            ? [{ text: cols[0].title, fs: titleFs }]
+            : captionTitleMode === "en"
+              ? [{ text: cols[1].title, fs: titleFs }]
+              : captionTitleMode === "groupV" || captionTitleMode === "groupH"
+                ? [{ text: cols[0].title, fs: titleFs }, { text: cols[1].title, fs: titleFsSmall }]
+                : []; // each
+        const sharedRow = captionTitleMode === "groupH" && both; // 左右並び
         const colHasTitle = !both || captionTitleMode === "each";
         const rowGap = Math.round(bodyFs * 0.9); // 縦並びの段間
         // 各本文カラムの高さ（自前見出しを含む場合あり）。
         const colBodyH = wrapped.map((w) => (colHasTitle ? titleLineH : 0) + w.lines.length * lineH);
-        const sharedTitleH = sharedTitles.length * titleLineH;
+        // 共有見出しの高さ：左右並びは1行（大きい方）、上下並びは各行の合計。
+        const sharedTitleH = sharedParts.length
+          ? sharedRow
+            ? lineHFor(Math.max(...sharedParts.map((p) => p.fs)))
+            : sharedParts.reduce((a, p) => a + lineHFor(p.fs), 0)
+          : 0;
         // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出しは上に加算。
         const bodyBlockH =
           sharedTitleH +
@@ -1956,11 +1970,28 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           for (const ln of w.lines) { ctx.fillText(ln, cx, ty + bodyFs); ty += lineH; }
         };
         let ty = by;
-        // 共有見出し（全幅・上にまとめる）
-        if (sharedTitles.length) {
+        // 共有見出し（全幅・上にまとめる）。左右並びはベースラインを大きい方に揃えて横に並べる。
+        if (sharedParts.length) {
           ctx.fillStyle = captionColor;
-          ctx.font = `700 ${titleFs}px ${ffTitle}`;
-          for (const t of sharedTitles) { ctx.fillText(t, bx, ty + titleFs); ty += titleLineH; }
+          if (sharedRow) {
+            const baseFs = Math.max(...sharedParts.map((p) => p.fs));
+            const baseline = ty + baseFs;
+            const gap = Math.round(baseFs * 0.4);
+            let cxp = bx;
+            sharedParts.forEach((p, pi) => {
+              ctx.font = `700 ${p.fs}px ${ffTitle}`;
+              if (pi > 0) cxp += gap;
+              ctx.fillText(p.text, cxp, baseline);
+              cxp += ctx.measureText(p.text).width;
+            });
+            ty += lineHFor(baseFs);
+          } else {
+            for (const p of sharedParts) {
+              ctx.font = `700 ${p.fs}px ${ffTitle}`;
+              ctx.fillText(p.text, bx, ty + p.fs);
+              ty += lineHFor(p.fs);
+            }
+          }
         }
         // 本文（縦＝積む / 横＝左右に並べる）
         if (vertical) {
@@ -3050,10 +3081,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   onPointerMove={onEditMove}
                   onPointerUp={onEditUp}
                 >
-                  {/* 共有見出し（両方かつ each 以外。全幅で上にまとめる） */}
-                  {capSharedTitles.map((t, i) => (
-                    <div key={i} className="ar-caption-title">{t}</div>
-                  ))}
+                  {/* 共有見出し（両方かつ each 以外。上にまとめる。row=左右並び・sub=小さめ） */}
+                  {capSharedTitleParts.length > 0 && (
+                    <div className={`ar-cap-shared${capSharedRow ? " is-row" : ""}`}>
+                      {capSharedTitleParts.map((p, i) => (
+                        <div key={i} className={`ar-caption-title${p.sub ? " is-sub" : ""}`}>{p.text}</div>
+                      ))}
+                    </div>
+                  )}
                   <div className={`ar-cap-cols${capBoth && captionLayout === "vertical" ? " is-vertical" : ""}`}>
                     {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
                       <div
@@ -3231,13 +3266,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             <div className="ar-font-sel">
                               <select
                                 value={captionTitleMode}
-                                onChange={(e) => setCaptionTitleMode(e.target.value as "each" | "stack" | "single" | "slash")}
+                                onChange={(e) => setCaptionTitleMode(e.target.value as "each" | "groupV" | "groupH" | "ja" | "en")}
                                 aria-label="見出しの出し方"
                               >
-                                <option value="each">本文ごとに表示</option>
-                                <option value="stack">上にまとめる（日・英）</option>
-                                <option value="single">上に日本語だけ</option>
-                                <option value="slash">上に「日 / 英」</option>
+                                <option value="each">本文ごと</option>
+                                <option value="groupV">まとめる（上下）</option>
+                                <option value="groupH">まとめる（左右）</option>
+                                <option value="ja">日本語のみ</option>
+                                <option value="en">英語のみ</option>
                               </select>
                             </div>
                           </div>

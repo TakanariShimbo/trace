@@ -1918,6 +1918,17 @@ body,
   font-weight: 600;
   color: #cfe0f5;
 }
+/* 共有見出し（まとめ表示）。上下は縦積み、左右は1行（ベースライン揃え）。 */
+.ar-cap-shared.is-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  flex-wrap: wrap;
+}
+/* まとめ表示の従（英語）見出しは小さめにしておしゃれに。焼き込みの 0.6 倍と一致。 */
+.ar-caption-title.is-sub {
+  font-size: calc(2.6cqmax * var(--cap-title-fs, 1) * 0.6);
+}
 .ar-caption-text {
   margin: 0.35em 0 0;
   font-family: var(--cap-body-ff, inherit);
