@@ -412,6 +412,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [labelBoxes, setLabelBoxes] = useState<Record<number, { w: number; h: number }>>({});
   // 選択枠（::before）の余白（正規化）。点を枠の辺上に置くために加える。横=1.2cqmax / 縦=0.8cqmax。
   const [labelFramePad, setLabelFramePad] = useState<{ h: number; v: number }>({ h: 0, v: 0 });
+  const [measureTick, setMeasureTick] = useState(0); // ステージのサイズ確定/変化時に計測をやり直すトリガー
   // 引き出し線がラベルの選んだ辺（選択枠の辺）の中点から出る座標（正規化）。
   const labelSidePoint = (i: number) => {
     const lb = arLabels[i];
@@ -2441,7 +2442,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ks.every((k) => prev[+k] && Math.abs(prev[+k].w - next[+k].w) < 1e-4 && Math.abs(prev[+k].h - next[+k].h) < 1e-4);
       return same ? prev : next;
     });
-  }, [arLabels, labelMode, labelNameScale, labelSubScale, roleFonts, bakeLabels, arStep, arExportMode]);
+  }, [arLabels, labelMode, labelNameScale, labelSubScale, roleFonts, bakeLabels, arStep, arExportMode, measureTick]);
+  // ステージのサイズはレンダーループが命令的に設定する（React state ではない）ため、
+  // マウント直後は寸法未確定で pad=0 のことがある。ResizeObserver でサイズ確定/変化時に再計測。
+  useEffect(() => {
+    const stage = arEditStageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => setMeasureTick((t) => t + 1));
+    ro.observe(stage);
+    return () => ro.disconnect();
+  }, [arStep, appMode]);
   const changeCamEyeHeight = (m: number) => {
     setCamEyeHeight(m);
     apiRef.current?.setCamEyeHeight(m);
