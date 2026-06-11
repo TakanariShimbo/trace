@@ -130,17 +130,19 @@ type ArLabel = {
 // 焼き込み文字の役割（サイズ・フォントを役割ごとに設定する単位）。
 type FontRole = "labelName" | "labelSub" | "captionTitle" | "captionBody";
 // フォントは和文・欧文をセットにした「ペア」で選ぶ。
-type FontPairId = "gothic" | "rounded" | "mincho" | "script";
-type FontPair = { label: string; jp: string; en: string };
+type FontPairId = "gothic" | "roundedGothic" | "modernGothic" | "mincho" | "posterMincho" | "brush";
+type FontPair = { label: string; jp: string; en: string; description: string };
 // 役割ごとにフォントペアを1つ持つ。
 type RoleFonts = Record<FontRole, FontPairId>;
 
 // 選べるフォントペア（和文＋欧文のセット。index.html で Google Fonts を読み込み）。
 const FONT_PAIRS: Record<FontPairId, FontPair> = {
-  gothic: { label: "ゴシック", jp: "Noto Sans JP", en: "Inter" },
-  rounded: { label: "丸ゴシック", jp: "M PLUS Rounded 1c", en: "Nunito" },
-  mincho: { label: "明朝", jp: "Noto Serif JP", en: "Noto Serif" },
-  script: { label: "筆記", jp: "Yuji Syuku", en: "Great Vibes" },
+  gothic: { label: "ゴシック", jp: "Noto Sans JP", en: "Inter", description: "読みやすい標準フォント。本文・ラベル・注記向き。" },
+  roundedGothic: { label: "丸ゴシック", jp: "M PLUS Rounded 1c", en: "Nunito", description: "丸みがあり、やさしく親しみやすい雰囲気。" },
+  modernGothic: { label: "モダンゴシック", jp: "Zen Kaku Gothic New", en: "Montserrat", description: "現代的で力強い。カードUIや大きめタイトル向き。" },
+  mincho: { label: "明朝", jp: "Noto Serif JP", en: "Noto Serif", description: "上品で落ち着いた雰囲気。観光ガイド風。" },
+  posterMincho: { label: "ポスター明朝", jp: "Shippori Mincho", en: "Cormorant Garamond", description: "雑誌・ポスター風の高級感。共有画像のタイトル向き。" },
+  brush: { label: "筆文字", jp: "Yuji Syuku", en: "Great Vibes", description: "和風で印象的。タイトル専用向き。" },
 };
 const FONT_PAIR_IDS = Object.keys(FONT_PAIRS) as FontPairId[];
 // 初期フォント（全役割ともゴシック）。
@@ -296,20 +298,23 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [roleFonts, setRoleFonts] = useState<RoleFonts>(DEFAULT_ROLE_FONTS);
   const setRoleFont = (role: FontRole, value: FontPairId) =>
     setRoleFonts((p) => ({ ...p, [role]: value }));
-  // 役割のフォント選択行（和文＋欧文をまとめて選ぶ1セレクト）。
+  // 役割のフォント選択行（和文＋欧文をまとめて選ぶ1セレクト）。選択中ペアの説明を下に出す。
   const fontRow = (role: FontRole, label: string) => (
-    <div className="ar-fs-row">
-      <span>{label}</span>
-      <div className="ar-font-sel">
-        <select value={roleFonts[role]} onChange={(e) => setRoleFont(role, e.target.value as FontPairId)} aria-label={label}>
-          {FONT_PAIR_IDS.map((id) => (
-            <option key={id} value={id}>
-              {FONT_PAIRS[id].label}
-            </option>
-          ))}
-        </select>
+    <>
+      <div className="ar-fs-row">
+        <span>{label}</span>
+        <div className="ar-font-sel">
+          <select value={roleFonts[role]} onChange={(e) => setRoleFont(role, e.target.value as FontPairId)} aria-label={label}>
+            {FONT_PAIR_IDS.map((id) => (
+              <option key={id} value={id} title={FONT_PAIRS[id].description}>
+                {FONT_PAIRS[id].label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-    </div>
+      <p className="ar-font-desc">{FONT_PAIRS[roleFonts[role]].description}</p>
+    </>
   );
   // 文字色。ラベルと解説で別々。
   const [labelColor, setLabelColor] = useState("#ffffff");

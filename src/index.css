@@ -1972,6 +1972,13 @@ body,
 .ar-font-sel select option {
   color: #1a2230;
 }
+/* 選択中フォントペアの説明（セレクト直下の小さな補足）。 */
+.ar-font-desc {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8b9bb0;
+}
 /* 焼き込み設定の折りたたみセクション（山名ラベル / 解説）。既定は開く。 */
 .ar-sec {
   display: flex;
