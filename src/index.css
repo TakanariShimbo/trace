@@ -1919,6 +1919,9 @@ body,
   color: #cfe0f5;
 }
 /* 共有見出し（まとめ表示）。上下は縦積み、左右は1行（ベースライン揃え）。 */
+.ar-cap-shared {
+  margin-bottom: calc(1.2cqmax * var(--cap-body-fs, 1)); /* 見出しと本文の間（焼き込みの 本文0.6倍 と一致） */
+}
 .ar-cap-shared.is-row {
   display: flex;
   align-items: baseline;

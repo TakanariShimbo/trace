@@ -1945,9 +1945,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ? lineHFor(Math.max(...sharedParts.map((p) => p.fs)))
             : sharedParts.reduce((a, p) => a + lineHFor(p.fs), 0)
           : 0;
-        // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出しは上に加算。
+        const sharedGap = sharedParts.length ? Math.round(bodyFs * 0.6) : 0; // 共有見出しと本文の間の余白
+        // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出し＋余白は上に加算。
         const bodyBlockH =
           sharedTitleH +
+          sharedGap +
           (vertical ? colBodyH.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1) : Math.max(...colBodyH));
         const blockH = bodyBlockH + Math.round(srcFs * 2);
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
@@ -1992,6 +1994,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               ty += lineHFor(p.fs);
             }
           }
+          ty += sharedGap; // 見出しと本文の間に余白
         }
         // 本文（縦＝積む / 横＝左右に並べる）
         if (vertical) {
