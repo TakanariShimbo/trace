@@ -3016,7 +3016,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             </div>
                           </div>
                           <div className="ar-fs-slider-row">
-                            <span>1段目のサイズ</span>
+                            <span>山名サイズ</span>
                             <span className="ar-fs-val">{Math.round(labelNameScale * 100)}%</span>
                           </div>
                           <input
@@ -3027,10 +3027,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             step={0.05}
                             value={labelNameScale}
                             onChange={(e) => setLabelNameScale(Number(e.target.value))}
-                            aria-label="ラベル1段目のサイズ"
+                            aria-label="山名サイズ"
                           />
                           <div className="ar-fs-slider-row">
-                            <span>2段目のサイズ</span>
+                            <span>補足サイズ</span>
                             <span className="ar-fs-val">{Math.round(labelSubScale * 100)}%</span>
                           </div>
                           <input
@@ -3041,7 +3041,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             step={0.05}
                             value={labelSubScale}
                             onChange={(e) => setLabelSubScale(Number(e.target.value))}
-                            aria-label="ラベル2段目のサイズ"
+                            aria-label="補足サイズ"
                           />
                         </>
                       )}
@@ -3095,7 +3095,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               </div>
                             </div>
                             <div className="ar-fs-slider-row">
-                              <span>タイトルのサイズ</span>
+                              <span>タイトルサイズ</span>
                               <span className="ar-fs-val">{Math.round(captionTitleScale * 100)}%</span>
                             </div>
                             <input
@@ -3106,10 +3106,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               step={0.05}
                               value={captionTitleScale}
                               onChange={(e) => setCaptionTitleScale(Number(e.target.value))}
-                              aria-label="解説タイトルのサイズ"
+                              aria-label="解説タイトルサイズ"
                             />
                             <div className="ar-fs-slider-row">
-                              <span>本文のサイズ</span>
+                              <span>本文サイズ</span>
                               <span className="ar-fs-val">{Math.round(captionBodyScale * 100)}%</span>
                             </div>
                             <input
@@ -3120,7 +3120,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               step={0.05}
                               value={captionBodyScale}
                               onChange={(e) => setCaptionBodyScale(Number(e.target.value))}
-                              aria-label="解説本文のサイズ"
+                              aria-label="解説本文サイズ"
                             />
                           </>
                         )}
