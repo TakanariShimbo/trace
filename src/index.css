@@ -1870,7 +1870,7 @@ body,
 /* 縦並び（日英を上下に積む）。段間は焼き込みの rowGap(≈本文0.9倍)に合わせる。 */
 .ar-cap-cols.is-vertical {
   flex-direction: column;
-  row-gap: calc(1.8cqmax * var(--cap-body-fs, 1));
+  row-gap: calc(1.4cqmax * var(--cap-body-fs, 1)); /* 本文どうしの段間（タグ周りと均等） */
 }
 .ar-cap-col {
   flex: 1;
@@ -1918,7 +1918,12 @@ body,
   display: flex;
   flex-wrap: wrap;
   gap: calc(0.6cqmax * var(--cap-body-fs, 1));
-  margin: calc(0.6cqmax * var(--cap-body-fs, 1)) 0;
+  /* タイトル↔タグ↔本文 を均等に（焼き込みの capGap=本文0.7倍 と一致）。 */
+  margin: calc(1.4cqmax * var(--cap-body-fs, 1)) 0;
+}
+/* タグ直後の本文は上マージンを消す（タグの下マージンだけで均等に保つ）。 */
+.ar-cap-tags + .ar-caption-text {
+  margin-top: 0;
 }
 .ar-cap-tag {
   font-family: var(--cap-body-ff, inherit);
@@ -1938,6 +1943,10 @@ body,
 /* 共有見出し（まとめ表示）。上下は縦積み、左右は1行（ベースライン揃え＋スラッシュ区切り）。 */
 .ar-cap-shared {
   margin-bottom: calc(2cqmax * var(--cap-body-fs, 1)); /* 見出しと本文の間（焼き込みの 本文1.0倍 と一致） */
+}
+/* タグが続くときは見出しの下マージンを消し、タグの上マージン(capGap)で均等に保つ。 */
+.ar-cap-shared.has-tags {
+  margin-bottom: 0;
 }
 .ar-cap-shared.is-row {
   display: flex;

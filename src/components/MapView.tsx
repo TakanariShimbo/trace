@@ -350,6 +350,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const capColHasTitle = !capBoth || captionTitleMode === "each";
   // タグ言語: 英語本文のときだけ英語、両方・日本語は日本語。
   const capTagLang: "ja" | "en" = captionLang === "en" ? "en" : "ja";
+  // 共有見出しモードでタグが続くか（見出しの下マージン制御に使う）。
+  const capSharedHasTags = !!capItem && capChips(capItem, capTagLang).length > 0;
   // タグ（ピル）プレビュー。指定言語のチップを並べる。空なら null。
   const capTagEls = (lang: "ja" | "en") => {
     if (!capItem) return null;
@@ -2035,15 +2037,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 : []; // each
         const sharedRow = captionTitleMode === "groupH" && both; // 左右並び
         const colHasTitle = !both || captionTitleMode === "each";
-        const rowGap = Math.round(bodyFs * 0.9); // 縦並びの段間
+        const capGap = Math.round(bodyFs * 0.7); // タイトル↔タグ↔本文↔本文 で均等にする隙間
+        const rowGap = capGap; // 縦並びの段間（タグ周りと均等）
         // --- タグ（ピル）。山名と本文の間に差し込む。空なら一切描かない（既存と同じ）。 ---
         const tagFs = Math.round(bodyFs * 0.82);
         const tagPadX = Math.round(tagFs * 0.5);
         const tagPillH = tagFs + Math.round(tagFs * 0.32) * 2;
         const tagPillGap = Math.round(tagFs * 0.38);
         const tagRadius = Math.round(tagPillH / 2);
-        const tagGapAbove = Math.round(bodyFs * 0.3);
-        const tagGapBelow = Math.round(bodyFs * 0.45);
         const tagFont = `600 ${tagFs}px ${ffBody}`;
         type PillRow = { t: string; w: number }[];
         const layoutPills = (chips: string[], maxW: number): PillRow[] => {
@@ -2093,9 +2094,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         //  - 両方かつ共有見出しモード: 見出しの下に1回表示。
         //  - 両方かつ「本文ごと」(each): 各本文に見出しが付くのでタグは出さない。
         const colTagRows = cols.map((_c, ci) => (colHasTitle && !both ? layoutPills(capChips(cap, tagLang), colWidths[ci]) : []));
-        const colTagH = colTagRows.map((rows) => (rows.length ? tagGapAbove + pillsH(rows) + tagGapBelow : 0));
+        const colTagH = colTagRows.map((rows) => (rows.length ? capGap + pillsH(rows) + capGap : 0));
         const sharedTagRows = sharedParts.length ? layoutPills(capChips(cap, tagLang), blockW) : [];
-        const sharedTagH = sharedTagRows.length ? tagGapAbove + pillsH(sharedTagRows) : 0;
         // 各本文カラムの高さ（自前見出し＋タグを含む場合あり）。
         const colBodyH = wrapped.map((w, ci) => (colHasTitle ? titleLineH : 0) + colTagH[ci] + w.lines.length * lineH);
         // 共有見出しの高さ：左右並びは1行（大きい方）、上下並びは各行の合計。
@@ -2104,12 +2104,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ? lineHFor(Math.max(...sharedParts.map((p) => p.fs)))
             : sharedParts.reduce((a, p) => a + lineHFor(p.fs), 0)
           : 0;
-        const sharedGap = sharedParts.length ? Math.round(bodyFs * 1.0) : 0; // 共有見出しと本文の間の余白
-        // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。共有見出し＋余白は上に加算。
+        const sharedGap = Math.round(bodyFs * 1.0); // 共有見出し→本文の余白（タグ無しのとき）
+        // 共有見出しの下〜本文の間。タグありは「見出し→(capGap)→タグ→(capGap)→本文」で均等に。
+        const sharedBelow = !sharedParts.length ? 0 : sharedTagRows.length ? capGap + pillsH(sharedTagRows) + capGap : sharedGap;
+        // 本文ブロックの高さ：縦は積み上げ＋段間、横は最も高いカラムに合わせる。
         const bodyBlockH =
           sharedTitleH +
-          sharedTagH +
-          sharedGap +
+          sharedBelow +
           (vertical ? colBodyH.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1) : Math.max(...colBodyH));
         const blockH = bodyBlockH;
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
@@ -2130,9 +2131,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             ty += titleLineH;
           }
           if (colHasTitle && colTagRows[ci].length) {
-            ty += tagGapAbove;
+            ty += capGap;
             drawPills(colTagRows[ci], cx, ty);
-            ty += pillsH(colTagRows[ci]) + tagGapBelow;
+            ty += pillsH(colTagRows[ci]) + capGap;
           }
           ctx.fillStyle = captionColor;
           ctx.font = `400 ${bodyFs}px ${ffBody}`;
@@ -2169,13 +2170,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               ty += lineHFor(p.fs);
             }
           }
-          // 共有見出しモードのタグ（見出しの下・本文の上に一度だけ）。
+          // 共有見出しモードのタグ（見出しの下・本文の上に一度だけ）。隙間は capGap で均等に。
           if (sharedTagRows.length) {
-            ty += tagGapAbove;
+            ty += capGap;
             drawPills(sharedTagRows, bx, ty);
-            ty += pillsH(sharedTagRows);
+            ty += pillsH(sharedTagRows) + capGap;
+          } else {
+            ty += sharedGap; // タグ無し: 見出しと本文の間の余白
           }
-          ty += sharedGap; // 見出しと本文の間に余白
         }
         // 本文（縦＝積む / 横＝左右に並べる）
         if (vertical) {
@@ -3268,7 +3270,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   {/* 共有見出し（両方かつ each 以外。上にまとめる。row=左右並び（スラッシュ区切り）・sub=小さめ） */}
                   {capSharedTitleParts.length > 0 && (
                     <div
-                      className={`ar-cap-shared${capSharedRow ? " is-row" : ""}`}
+                      className={`ar-cap-shared${capSharedRow ? " is-row" : ""}${capSharedHasTags ? " has-tags" : ""}`}
                       style={capSharedRow ? ({ "--cap-sub-ratio": 0.8 } as React.CSSProperties) : undefined}
                     >
                       {capSharedRow ? (
@@ -3483,30 +3485,34 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                           </div>
                         )}
                         {captionLang !== "none" && (
-                          <div className="ar-fs-row">
-                            <span>タグ</span>
-                            <div className="seg" role="group" aria-label="高さ・場所タグ">
-                              <button className={capShowElev ? "is-active" : ""} onClick={() => setCapShowElev((v) => !v)}>
+                          <>
+                            <div className="ar-fs-row">
+                              <span>タグ</span>
+                            </div>
+                            <div className="ar-caption-pick">
+                              <button
+                                className={`ar-cap-chip${capShowElev ? " is-on" : ""}`}
+                                onClick={() => setCapShowElev((v) => !v)}
+                              >
                                 高さ
                               </button>
-                              <button className={capShowLoc ? "is-active" : ""} onClick={() => setCapShowLoc((v) => !v)}>
+                              <button
+                                className={`ar-cap-chip${capShowLoc ? " is-on" : ""}`}
+                                onClick={() => setCapShowLoc((v) => !v)}
+                              >
                                 場所
                               </button>
+                              {(capItem?.tagsJa ?? []).map((t) => (
+                                <button
+                                  key={t}
+                                  className={`ar-cap-chip${capSelectedTags.includes(t) ? " is-on" : ""}`}
+                                  onClick={() => toggleCapTag(t)}
+                                >
+                                  {t}
+                                </button>
+                              ))}
                             </div>
-                          </div>
-                        )}
-                        {captionLang !== "none" && (capItem?.tagsJa?.length ?? 0) > 0 && (
-                          <div className="ar-caption-pick">
-                            {capItem!.tagsJa!.map((t) => (
-                              <button
-                                key={t}
-                                className={`ar-cap-chip${capSelectedTags.includes(t) ? " is-on" : ""}`}
-                                onClick={() => toggleCapTag(t)}
-                              >
-                                {t}
-                              </button>
-                            ))}
-                          </div>
+                          </>
                         )}
                         {captionLang === "both" && (
                           <div className="ar-fs-row">
