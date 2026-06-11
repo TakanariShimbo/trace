@@ -1867,9 +1867,18 @@ body,
   display: flex;
   gap: 0;
 }
+/* 縦並び（日英を上下に積む）。段間は焼き込みの rowGap(≈本文0.9倍)に合わせる。 */
+.ar-cap-cols.is-vertical {
+  flex-direction: column;
+  row-gap: calc(1.8cqmax * var(--cap-body-fs, 1));
+}
 .ar-cap-col {
   flex: 1;
   min-width: 0;
+}
+.ar-cap-cols.is-vertical .ar-cap-col {
+  flex: none;
+  width: 100%;
 }
 /* 日英の区切り線（ドラッグで分割比を変える）。中央に丸グリップ。 */
 .ar-cap-divider {

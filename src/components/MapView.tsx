@@ -282,6 +282,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   } | null>(null);
   // 両方表示のときの日英の分割比（左=日本語の割合）。間の線をドラッグで調整。
   const [captionSplit, setCaptionSplit] = useState(0.5);
+  // 両方表示のときの日英の並べ方（横=左右2カラム / 縦=上下に積む）。
+  const [captionLayout, setCaptionLayout] = useState<"horizontal" | "vertical">("horizontal");
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // 文字サイズ倍率（スライダーで連続調整）。役割ごとに独立。初期値はすべて 1.0。
@@ -1844,9 +1846,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const lineH = Math.round(bodyFs * 1.5);
         const blockW = Math.round(W * captionW);
         const colGap = Math.round(W * 0.035);
-        // 両方のときは captionSplit（左=日本語の割合）で各カラム幅を決める。
-        const colWidths =
-          cols.length > 1
+        const vertical = captionLayout === "vertical" && cols.length > 1; // 縦=上下に積む
+        // 横並びは captionSplit（左=日本語の割合）で各カラム幅を決める。縦並びは全幅。
+        const colWidths = vertical
+          ? cols.map(() => blockW)
+          : cols.length > 1
             ? [Math.round((blockW - colGap) * captionSplit), blockW - colGap - Math.round((blockW - colGap) * captionSplit)]
             : [blockW];
         ctx.textAlign = "left";
@@ -1891,8 +1895,14 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           ctx.font = `400 ${bodyFs}px ${ffBody}`;
           return { title: c.title, lines: wrapBody(c.body, colWidths[ci]) };
         });
+        const colHeights = wrapped.map((w) => titleLineH + w.lines.length * lineH);
         const maxLines = Math.max(...wrapped.map((w) => w.lines.length));
-        const blockH = titleLineH + maxLines * lineH + Math.round(srcFs * 2);
+        const rowGap = Math.round(bodyFs * 0.9); // 縦並びの段間
+        // 本文ブロックの高さ。縦並びは各段の合計＋段間、横並びは最も長い段に合わせる。
+        const bodyBlockH = vertical
+          ? colHeights.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1)
+          : titleLineH + maxLines * lineH;
+        const blockH = bodyBlockH + Math.round(srcFs * 2);
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
         const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
         // 影で可読性を確保（背景ボックスなし）。影は文字色の反対色（黒文字の白影は控えめ）。
@@ -1900,22 +1910,32 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.shadowColor = captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)";
         ctx.shadowBlur = Math.round(L * 0.004);
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
-        wrapped.forEach((w, ci) => {
-          const cx = bx + (ci === 0 ? 0 : colWidths[0] + colGap);
-          let ty = by;
+        const drawCol = (w: { title: string; lines: string[] }, cx: number, top: number) => {
+          let ty = top;
           ctx.fillStyle = captionColor;
           ctx.font = `700 ${titleFs}px ${ffTitle}`;
           ctx.fillText(w.title, cx, ty + titleFs);
           ty += titleLineH;
           ctx.font = `400 ${bodyFs}px ${ffBody}`;
           for (const ln of w.lines) { ctx.fillText(ln, cx, ty + bodyFs); ty += lineH; }
-        });
+        };
+        if (vertical) {
+          let ty = by;
+          wrapped.forEach((w, ci) => {
+            drawCol(w, bx, ty);
+            ty += colHeights[ci] + rowGap;
+          });
+        } else {
+          wrapped.forEach((w, ci) => {
+            drawCol(w, bx + (ci === 0 ? 0 : colWidths[0] + colGap), by);
+          });
+        }
         // 出典（1回、左下。少し薄く）
         ctx.globalAlpha = 0.75;
         ctx.fillStyle = captionColor;
         ctx.font = `400 ${srcFs}px ${ffBody}`;
         const srcText = captionLang === "en" ? "Auto-generated from facts (ref: Wikipedia et al.)" : "解説は事実をもとに自動生成（参考: Wikipedia ほか）";
-        ctx.fillText(srcText, bx, by + titleLineH + maxLines * lineH + srcFs);
+        ctx.fillText(srcText, bx, by + bodyBlockH + srcFs);
         ctx.restore();
       }
     }
@@ -2985,17 +3005,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   onPointerMove={onEditMove}
                   onPointerUp={onEditUp}
                 >
-                  <div className="ar-cap-cols">
+                  <div className={`ar-cap-cols${captionLang === "both" && captionLayout === "vertical" ? " is-vertical" : ""}`}>
                     {(captionLang === "ja" || captionLang === "both") && arLabels[captionIdx].description && (
                       <div
                         className="ar-cap-col"
-                        style={captionLang === "both" ? { flex: `${captionSplit} 1 0` } : undefined}
+                        style={captionLang === "both" && captionLayout === "horizontal" ? { flex: `${captionSplit} 1 0` } : undefined}
                       >
                         <div className="ar-caption-title">{arLabels[captionIdx].name}</div>
                         <p className="ar-caption-text">{arLabels[captionIdx].description}</p>
                       </div>
                     )}
-                    {captionLang === "both" && arLabels[captionIdx].description && arLabels[captionIdx].descriptionEn && (
+                    {captionLang === "both" && captionLayout === "horizontal" && arLabels[captionIdx].description && arLabels[captionIdx].descriptionEn && (
                       <div
                         className="ar-cap-divider"
                         title="日英の境界を動かす"
@@ -3007,7 +3027,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     {(captionLang === "en" || captionLang === "both") && arLabels[captionIdx].descriptionEn && (
                       <div
                         className="ar-cap-col"
-                        style={captionLang === "both" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
+                        style={captionLang === "both" && captionLayout === "horizontal" ? { flex: `${1 - captionSplit} 1 0` } : undefined}
                       >
                         <div className="ar-caption-title">{arLabels[captionIdx].nameEn || arLabels[captionIdx].name}</div>
                         <p className="ar-caption-text">{arLabels[captionIdx].descriptionEn}</p>
@@ -3144,6 +3164,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             ))}
                           </div>
                         </div>
+                        {captionLang === "both" && (
+                          <div className="ar-fs-row">
+                            <span>並べ方</span>
+                            <div className="seg" role="group" aria-label="日英の並べ方">
+                              {([["横", "horizontal"], ["縦", "vertical"]] as [string, "horizontal" | "vertical"][]).map(([lab, v]) => (
+                                <button key={v} className={captionLayout === v ? "is-active" : ""} onClick={() => setCaptionLayout(v)}>
+                                  {lab}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
                           <div className="ar-caption-pick">
                             {arLabels.map((l, i) =>
