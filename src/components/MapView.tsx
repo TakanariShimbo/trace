@@ -410,15 +410,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const labelHasSub = labelMode !== "jaOnly" && labelMode !== "enOnly";
   // ラベルの実寸（正規化）。引き出し線をラベルの上下左右どの辺から出すか計算するのに使う。
   const [labelBoxes, setLabelBoxes] = useState<Record<number, { w: number; h: number }>>({});
-  // 引き出し線がラベルの選んだ辺の中点から出る座標（正規化）。
+  // 選択枠（::before）の余白（正規化）。点を枠の辺上に置くために加える。横=1.2cqmax / 縦=0.8cqmax。
+  const [labelFramePad, setLabelFramePad] = useState<{ h: number; v: number }>({ h: 0, v: 0 });
+  // 引き出し線がラベルの選んだ辺（選択枠の辺）の中点から出る座標（正規化）。
   const labelSidePoint = (i: number) => {
     const lb = arLabels[i];
     const box = labelBoxes[i] ?? { w: 0, h: 0 };
+    const { h: ph, v: pv } = labelFramePad;
     const anchor = lb?.labelAnchor ?? "bottom";
-    if (anchor === "top") return { x: lb.labelU, y: lb.labelV - box.h };
-    if (anchor === "left") return { x: lb.labelU - box.w / 2, y: lb.labelV - box.h / 2 };
-    if (anchor === "right") return { x: lb.labelU + box.w / 2, y: lb.labelV - box.h / 2 };
-    return { x: lb.labelU, y: lb.labelV }; // bottom（下端中央）
+    if (anchor === "top") return { x: lb.labelU, y: lb.labelV - box.h - pv };
+    if (anchor === "left") return { x: lb.labelU - box.w / 2 - ph, y: lb.labelV - box.h / 2 };
+    if (anchor === "right") return { x: lb.labelU + box.w / 2 + ph, y: lb.labelV - box.h / 2 };
+    return { x: lb.labelU, y: lb.labelV + pv }; // bottom（枠の下辺）
   };
   // 文字サイズ倍率（スライダーで連続調整）。役割ごとに独立。初期値はすべて 1.0。
   //  labelNameScale    … ラベル1段目（山名）のサイズ。0.7〜2.0
@@ -1948,11 +1951,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         }
         const boxW = Math.max(nameW, subW);
         const boxTop = nameBaseline - nameFs;
-        const boxBottom = (sub ? subBaseline : nameBaseline) + Math.round((sub ? subFs : nameFs) * 0.25);
+        const boxBottom = cy; // 下端基準（プレビューの名札ボックス下端＝labelV に対応）
         const boxMidY = (boxTop + boxBottom) / 2;
         const anchor = lb.labelAnchor ?? "bottom";
-        const ax = anchor === "left" ? cx - boxW / 2 : anchor === "right" ? cx + boxW / 2 : cx;
-        const ay = anchor === "top" ? boxTop : anchor === "bottom" ? boxBottom : boxMidY;
+        // プレビューの選択枠（横1.2cqmax / 縦0.8cqmax）に合わせて辺の外側へ。
+        const padH = L * 0.012, padV = L * 0.008;
+        const ax = anchor === "left" ? cx - boxW / 2 - padH : anchor === "right" ? cx + boxW / 2 + padH : cx;
+        const ay = anchor === "top" ? boxTop - padV : anchor === "bottom" ? boxBottom + padV : boxMidY;
         const bx = dotX, by = dotY;
         ctx.strokeStyle = labelColor;
         ctx.globalAlpha = 0.9;
@@ -2418,6 +2423,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     if (!stage) return;
     const r = stage.getBoundingClientRect();
     if (!r.width || !r.height) return;
+    // 選択枠の余白（cqmax = ステージ長辺の1%）を正規化で保持。
+    const cq = Math.max(r.width, r.height) / 100;
+    const pad = { h: (1.2 * cq) / r.width, v: (0.8 * cq) / r.height };
+    setLabelFramePad((prev) => (Math.abs(prev.h - pad.h) < 1e-5 && Math.abs(prev.v - pad.v) < 1e-5 ? prev : pad));
     const next: Record<number, { w: number; h: number }> = {};
     stage.querySelectorAll<HTMLElement>(".ar-edit-label").forEach((el) => {
       const idx = Number(el.dataset.idx);

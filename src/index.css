@@ -1774,8 +1774,8 @@ body,
 .ar-edit-label::before {
   content: "";
   position: absolute;
-  /* 下辺は点(ラベルアンカー=要素下端)を通すよう 0、他3辺は余白を取る */
-  inset: -0.8cqmax -1.2cqmax 0;
+  /* 上下 0.8cqmax・左右 1.2cqmax で四辺を均等に余白。点は枠の辺上に置く。 */
+  inset: -0.8cqmax -1.2cqmax;
   border: 0.2cqmax solid rgba(143, 194, 255, 0.6);
   border-radius: 0.8cqmax;
   pointer-events: none;
