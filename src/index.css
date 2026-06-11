@@ -1776,12 +1776,14 @@ body,
   pointer-events: none;
 }
 .ar-label-name {
+  font-family: var(--label-name-ff, inherit);
   font-size: calc(2.7cqmax * var(--label-name-fs, 1));
   font-weight: 700;
   letter-spacing: 0.01em;
 }
 .ar-label-sub {
   margin-top: 0.15em;
+  font-family: var(--label-sub-ff, inherit);
   font-size: calc(1.55cqmax * var(--label-sub-fs, 1));
   font-weight: 500;
   opacity: 0.92;
@@ -1895,6 +1897,7 @@ body,
   border-radius: 50%;
 }
 .ar-caption-title {
+  font-family: var(--cap-title-ff, inherit);
   font-size: calc(2.6cqmax * var(--cap-title-fs, 1)); /* 写真長辺の 2.6% × タイトル倍率 */
   font-weight: 700;
   display: flex;
@@ -1908,12 +1911,14 @@ body,
 }
 .ar-caption-text {
   margin: 0.35em 0 0;
+  font-family: var(--cap-body-ff, inherit);
   font-size: calc(2cqmax * var(--cap-body-fs, 1));
   line-height: 1.5;
   color: inherit; /* 解説の色を本文にも適用 */
 }
 .ar-caption-src {
   margin-top: 0.4em;
+  font-family: var(--cap-body-ff, inherit);
   font-size: calc(1.3cqmax * var(--cap-src-fs, 1));
   color: inherit;
   opacity: 0.78;
@@ -1944,6 +1949,41 @@ body,
 .ar-fs-slider {
   width: 100%;
   margin: 2px 0 2px;
+}
+/* フォント選択（和文・欧文の2セレクトを横並び）。 */
+.ar-font-selects {
+  display: flex;
+  gap: 8px;
+}
+.ar-font-sel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: rgba(40, 52, 68, 0.5);
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 8px;
+}
+.ar-font-sel > span {
+  flex: none;
+  font-size: 11px;
+  color: #9fb0c4;
+}
+.ar-font-sel select {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #cdd6e2;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
+.ar-font-sel select option {
+  color: #1a2230;
 }
 /* 焼き込み設定の折りたたみセクション（山名ラベル / 解説）。既定は開く。 */
 .ar-sec {

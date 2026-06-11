@@ -127,6 +127,37 @@ type ArLabel = {
   source?: string; // 参考URL
 };
 
+// 焼き込み文字の役割（サイズ・フォントを役割ごとに設定する単位）。
+type FontRole = "labelName" | "labelSub" | "captionTitle" | "captionBody";
+type FontLang = "jp" | "en";
+// 役割ごとに日本語(jp)/英語(en)のフォントファミリを持つ。
+type RoleFonts = Record<FontRole, Record<FontLang, string>>;
+
+// 選べる和文フォント（index.html で Google Fonts を読み込み）。
+const JP_FONTS: { label: string; value: string }[] = [
+  { label: "ゴシック", value: "Noto Sans JP" },
+  { label: "明朝", value: "Noto Serif JP" },
+  { label: "和風明朝", value: "Shippori Mincho" },
+];
+// 選べる欧文フォント。
+const EN_FONTS: { label: string; value: string }[] = [
+  { label: "Sans", value: "Noto Sans" },
+  { label: "Inter", value: "Inter" },
+  { label: "Serif", value: "Noto Serif" },
+  { label: "Garamond", value: "Cormorant Garamond" },
+  { label: "Montserrat", value: "Montserrat" },
+];
+// 初期フォント（全役割とも標準ゴシック相当）。
+const DEFAULT_ROLE_FONTS: RoleFonts = {
+  labelName: { jp: "Noto Sans JP", en: "Noto Sans" },
+  labelSub: { jp: "Noto Sans JP", en: "Inter" },
+  captionTitle: { jp: "Noto Sans JP", en: "Noto Sans" },
+  captionBody: { jp: "Noto Sans JP", en: "Noto Sans" },
+};
+// 役割のフォントを canvas/CSS 用のファミリ指定に展開する。
+// 欧文を先・和文を後に並べ、ラテン字は欧文フォント・CJKは和文フォントが当たるようにする。
+const roleFontStack = (rf: Record<FontLang, string>) => `"${rf.en}", "${rf.jp}", system-ui, sans-serif`;
+
 export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
   const arLike = appMode === "ar" || appMode === "live";
@@ -262,6 +293,40 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const [labelSubScale, setLabelSubScale] = useState(1);
   const [captionTitleScale, setCaptionTitleScale] = useState(1);
   const [captionBodyScale, setCaptionBodyScale] = useState(1);
+  // 役割ごとの日英フォント。山名/補足/タイトル/本文で個別に指定できる。
+  const [roleFonts, setRoleFonts] = useState<RoleFonts>(DEFAULT_ROLE_FONTS);
+  const setRoleFont = (role: FontRole, lang: FontLang, value: string) =>
+    setRoleFonts((p) => ({ ...p, [role]: { ...p[role], [lang]: value } }));
+  // 役割の日英フォント選択行（和文・欧文の2セレクト）。
+  const fontRow = (role: FontRole, label: string) => (
+    <>
+      <div className="ar-fs-slider-row">
+        <span>{label}</span>
+      </div>
+      <div className="ar-font-selects">
+        <label className="ar-font-sel">
+          <span>和文</span>
+          <select value={roleFonts[role].jp} onChange={(e) => setRoleFont(role, "jp", e.target.value)} aria-label={`${label}（和文）`}>
+            {JP_FONTS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ar-font-sel">
+          <span>欧文</span>
+          <select value={roleFonts[role].en} onChange={(e) => setRoleFont(role, "en", e.target.value)} aria-label={`${label}（欧文）`}>
+            {EN_FONTS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    </>
+  );
   // 文字色。ラベルと解説で別々。
   const [labelColor, setLabelColor] = useState("#ffffff");
   const [captionColor, setCaptionColor] = useState("#ffffff");
@@ -1718,7 +1783,23 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     ctx.drawImage(img, 0, 0, W, H);
     const nameFs = Math.round(L * 0.026 * labelNameScale); // 山名（1段目）
     const subFs = Math.round(L * 0.026 * 0.62 * labelSubScale); // Mt.ローマ字｜標高（2段目）
-    const F = "system-ui, -apple-system, sans-serif";
+    // 役割ごとのフォントファミリ（欧文先・和文後の合成スタック）。
+    const ffName = roleFontStack(roleFonts.labelName);
+    const ffSub = roleFontStack(roleFonts.labelSub);
+    const ffTitle = roleFontStack(roleFonts.captionTitle);
+    const ffBody = roleFontStack(roleFonts.captionBody);
+    // canvas はフォント未ロードだと既定にフォールバックするため、使うフォントを先に読み込む。
+    const fontLoads: Promise<unknown>[] = [];
+    for (const [w, rf] of [
+      [700, roleFonts.labelName],
+      [500, roleFonts.labelSub],
+      [700, roleFonts.captionTitle],
+      [400, roleFonts.captionBody],
+    ] as [number, Record<FontLang, string>][]) {
+      fontLoads.push(document.fonts.load(`${w} 16px "${rf.jp}"`).catch(() => {}));
+      fontLoads.push(document.fonts.load(`${w} 16px "${rf.en}"`).catch(() => {}));
+    }
+    await Promise.all(fontLoads);
     ctx.textBaseline = "alphabetic";
     if (bakeLabels) {
       for (const lb of arLabels) {
@@ -1749,9 +1830,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.001));
         ctx.textAlign = "center";
         ctx.fillStyle = labelColor;
-        ctx.font = `700 ${nameFs}px ${F}`;
+        ctx.font = `700 ${nameFs}px ${ffName}`;
         ctx.fillText(name, cx, nameBaseline);
-        ctx.font = `500 ${subFs}px ${F}`;
+        ctx.font = `500 ${subFs}px ${ffSub}`;
         ctx.fillText(sub, cx, subBaseline);
         ctx.restore();
       }
@@ -1817,7 +1898,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           return lines;
         };
         const wrapped = cols.map((c, ci) => {
-          ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+          ctx.font = `400 ${bodyFs}px ${ffBody}`;
           return { title: c.title, lines: wrapBody(c.body, colWidths[ci]) };
         });
         const maxLines = Math.max(...wrapped.map((w) => w.lines.length));
@@ -1833,16 +1914,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           const cx = bx + (ci === 0 ? 0 : colWidths[0] + colGap);
           let ty = by;
           ctx.fillStyle = captionColor;
-          ctx.font = `700 ${titleFs}px system-ui, -apple-system, sans-serif`;
+          ctx.font = `700 ${titleFs}px ${ffTitle}`;
           ctx.fillText(w.title, cx, ty + titleFs);
           ty += titleLineH;
-          ctx.font = `400 ${bodyFs}px system-ui, -apple-system, sans-serif`;
+          ctx.font = `400 ${bodyFs}px ${ffBody}`;
           for (const ln of w.lines) { ctx.fillText(ln, cx, ty + bodyFs); ty += lineH; }
         });
         // 出典（1回、左下。少し薄く）
         ctx.globalAlpha = 0.75;
         ctx.fillStyle = captionColor;
-        ctx.font = `400 ${srcFs}px system-ui, -apple-system, sans-serif`;
+        ctx.font = `400 ${srcFs}px ${ffBody}`;
         const srcText = captionLang === "en" ? "Auto-generated from facts (ref: Wikipedia et al.)" : "解説は事実をもとに自動生成（参考: Wikipedia ほか）";
         ctx.fillText(srcText, bx, by + titleLineH + maxLines * lineH + srcFs);
         ctx.restore();
@@ -2800,6 +2881,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 "--cap-title-fs": captionTitleScale, // 解説タイトル
                 "--cap-body-fs": captionBodyScale, // 解説本文
                 "--cap-src-fs": captionBodyScale, // 出典（本文に合わせる）
+                "--label-name-ff": roleFontStack(roleFonts.labelName), // 山名フォント
+                "--label-sub-ff": roleFontStack(roleFonts.labelSub), // 補足フォント
+                "--cap-title-ff": roleFontStack(roleFonts.captionTitle), // タイトルフォント
+                "--cap-body-ff": roleFontStack(roleFonts.captionBody), // 本文フォント
               } as React.CSSProperties
             }
           >
@@ -3029,6 +3114,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             onChange={(e) => setLabelNameScale(Number(e.target.value))}
                             aria-label="山名サイズ"
                           />
+                          {fontRow("labelName", "山名フォント")}
                           <div className="ar-fs-slider-row">
                             <span>補足サイズ</span>
                             <span className="ar-fs-val">{Math.round(labelSubScale * 100)}%</span>
@@ -3043,6 +3129,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             onChange={(e) => setLabelSubScale(Number(e.target.value))}
                             aria-label="補足サイズ"
                           />
+                          {fontRow("labelSub", "補足フォント")}
                         </>
                       )}
                     </details>
@@ -3108,6 +3195,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               onChange={(e) => setCaptionTitleScale(Number(e.target.value))}
                               aria-label="解説タイトルサイズ"
                             />
+                            {fontRow("captionTitle", "タイトルフォント")}
                             <div className="ar-fs-slider-row">
                               <span>本文サイズ</span>
                               <span className="ar-fs-val">{Math.round(captionBodyScale * 100)}%</span>
@@ -3122,6 +3210,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                               onChange={(e) => setCaptionBodyScale(Number(e.target.value))}
                               aria-label="解説本文サイズ"
                             />
+                            {fontRow("captionBody", "本文フォント")}
                           </>
                         )}
                       </details>
