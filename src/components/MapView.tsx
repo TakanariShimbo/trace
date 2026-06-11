@@ -29,7 +29,6 @@ import {
   IconMinus,
   IconSearch,
   IconCompass,
-  IconInfo,
   IconLandscape,
 } from "./icons";
 import {
@@ -467,7 +466,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
   const arPinXZRef = useRef<{ x: number; z: number } | null>(null); // 撮影地点ピンのワールドXZ
   const [modePanelOpen, setModePanelOpen] = useState(true); // celestial/offline の専用パネルの折り畳み
-  const [dockSecOpen, setDockSecOpen] = useState<Record<string, boolean>>({ basemap: false }); // 既定=開（地図は航空写真が既定なので畳む）
+  const [dockTab, setDockTab] = useState<Record<string, string>>({}); // パネルごとに選択中タブID（縦折りたたみ→タブ化）
   const arPinElRef = useRef<HTMLDivElement | null>(null); // 撮影地点ピンのDOM（先端を地表に接地）
   const arPhotoAspectRef = useRef<number | null>(null); // 撮影写真の縦横比(W/H)。3D枠の整形に使う
   const arPhotoElRef = useRef<HTMLImageElement | null>(null); // 写真オーバーレイのDOM（枠に追従）
@@ -2906,41 +2905,47 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     : isOffline
       ? "保存したい範囲を画面中央に合わせ、「画面中央を中心地点にする」で中心を決めます。半径・詳細度を選び「ダウンロード」で保存します。"
       : "地図をドラッグ／検索で移動します。「風景」に切り替えると、その場に立ったように見回せます。";
-  // 折りたたみ可能なセクション（見出しクリックで開閉）。縦長対策。既定は開。
-  const dockSection = (id: string, label: React.ReactNode, content: React.ReactNode) => {
-    const open = dockSecOpen[id] ?? true;
+  // 操作行（地図/カメラ・3D/2D・現在地・撮影地点へ 等）。タブ「操作」の中身に使う。
+  // 折りたたみ帯をやめ、タブで1項目だけ表示する。アナウンスはタイトルなし本文のみ。
+  const announce = (text: React.ReactNode) => <p className="dock-announce">{text}</p>;
+  type DockTab = { id: string; label: React.ReactNode; content: React.ReactNode };
+  // パネル内のセクションをタブ化（key ごとに選択を保持）。1項目だけのときはタブ列を出さない。
+  const dockTabs = (key: string, tabs: (DockTab | false | null | undefined)[]) => {
+    const list = tabs.filter(Boolean) as DockTab[];
+    if (!list.length) return null;
+    const active = list.some((t) => t.id === dockTab[key]) ? dockTab[key] : list[0].id;
     return (
-      <div className="dock-section">
-        <button
-          type="button"
-          className="dock-section-head"
-          aria-expanded={open}
-          onClick={() => setDockSecOpen((s) => ({ ...s, [id]: !(s[id] ?? true) }))}
-        >
-          <IconCaret dir={open ? "down" : "right"} size={12} />
-          <span className="dock-section-label">{label}</span>
-        </button>
-        {open && <div className="dock-section-body">{content}</div>}
+      <div className="dock-tabwrap">
+        {list.length > 1 && (
+          <div className="dock-tabs" role="tablist">
+            {list.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={t.id === active}
+                className={`dock-tab${t.id === active ? " is-active" : ""}`}
+                onClick={() => setDockTab((s) => ({ ...s, [key]: t.id }))}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="dock-tab-body">{list.find((t) => t.id === active)?.content}</div>
       </div>
     );
   };
-  // アナウンス（案内文）も折りたたみ帯に。先頭は ℹ。
-  const announce = (text: React.ReactNode) =>
-    dockSection(
-      "hint",
+  // 「操作」タブの中身（地図/カメラ・3D/2D・現在地 等）。
+  const viewTab: DockTab = {
+    id: "view",
+    label: (
       <>
-        <IconInfo size={13} /> 案内
-      </>,
-      <p className="hint-text">{text}</p>,
-    );
-  // 操作行（地図/カメラ・3D/2D・現在地・撮影地点へ 等）も折りたたみ帯に。先頭は移動アイコン。
-  const viewSection = dockSection(
-    "view",
-    <>
-      <IconMove size={13} /> 操作
-    </>,
-    dockControls,
-  );
+        <IconMove size={13} /> 操作
+      </>
+    ),
+    content: dockControls,
+  };
   // カメラ視点の読み取り・スライダー（地形/天体のカメラビューと AR で使い回す）。
   const cameraReadout = (
     <div className="cam-readout">
@@ -3114,43 +3119,46 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       : "地図をタップして撮影方向を指します。スライダーで画角（写る範囲）を調整します。"
                     : `${appMode === "live" ? "見えている山を" : "写真に写る山を"}タップして選びます。地図は自由に動かせます。ずれたら「${appMode === "live" ? "地点に戻る" : "撮影地点へ"}」で元の構図に戻せます。`,
               )}
-              {/* 操作（現在地・3D/2D・撮影地点へ） */}
-              {viewSection}
-              {/* 内容 */}
-              {arStep === "locate" && appMode !== "live" && dockSection("arsearch", <><IconSearch size={13} /> 検索</>, searchPanel)}
-              {arStep === "select" && dockSection("arsearch", <><IconSearch size={13} /> 検索</>, searchPanel)}
-              {arStep === "params" &&
-                dockSection(
-                  "arparams",
-                  <>
-                    <IconCompass size={13} /> 向き・画角
-                  </>,
-                  <>
-                    <div className="cam-readout">
-                      <div className="cam-stat">
-                        <span>方向</span>
-                        <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
-                      </div>
-                      <div className="cam-stat">
-                        <span>横画角</span>
-                        <b>{Math.round(arFovDeg)}°</b>
-                      </div>
-                    </div>
-                    {appMode === "live" && (
-                      <button className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`} onClick={() => setLiveFollow((v) => !v)}>
-                        <IconLocate size={14} />
-                        {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
-                      </button>
-                    )}
-                    {camSlider(
-                      <>
-                        画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
-                      </>,
-                      `${Math.round(arFovDeg)}°`,
-                      <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
-                    )}
-                  </>,
-                )}
+              {/* セクションはタブで1つだけ表示 */}
+              {dockTabs(`ar-${arStep}`, [
+                viewTab,
+                (arStep === "locate" && appMode !== "live") || arStep === "select"
+                  ? { id: "search", label: <><IconSearch size={13} /> 検索</>, content: searchPanel }
+                  : null,
+                arStep === "params"
+                  ? {
+                      id: "params",
+                      label: <><IconCompass size={13} /> 向き・画角</>,
+                      content: (
+                        <>
+                          <div className="cam-readout">
+                            <div className="cam-stat">
+                              <span>方向</span>
+                              <b>{compass(arHeadingDeg ?? 0)} {Math.round(arHeadingDeg ?? 0)}°</b>
+                            </div>
+                            <div className="cam-stat">
+                              <span>横画角</span>
+                              <b>{Math.round(arFovDeg)}°</b>
+                            </div>
+                          </div>
+                          {appMode === "live" && (
+                            <button className={`ar-follow-toggle${liveFollow ? " is-on" : ""}`} onClick={() => setLiveFollow((v) => !v)}>
+                              <IconLocate size={14} />
+                              {liveFollow ? "方位センサーで追従中（タップで固定）" : "固定中（タップで方位センサーに戻す）"}
+                            </button>
+                          )}
+                          {camSlider(
+                            <>
+                              画角 <i className="cam-eye-sub">望遠 ←→ 広角</i>
+                            </>,
+                            `${Math.round(arFovDeg)}°`,
+                            <input type="range" min={CAM_FOV_MIN} max={CAM_FOV_MAX} value={Math.round(arFovDeg)} onChange={(e) => setArFovDeg(Number(e.target.value))} />,
+                          )}
+                        </>
+                      ),
+                    }
+                  : null,
+              ])}
               {/* 進行ボタン（最下部） */}
               {arStep === "locate" && (
                 <div className="ar-dock-actions">
@@ -3446,24 +3454,20 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     ? `「編集」で名札・解説をドラッグ配置、「画像」で写真をパン・拡大（切替で誤操作を防止）。解説の言語・幅・文字サイズも下で調整できます（${arLabels.length}件）。`
                     : "写真の枠内に山がありません。前の手順に戻り、向きを合わせ直してください。",
                 )}
-                {/* 操作（編集/画像 切替・ズーム）。他フェーズと同様、案内の下に独立セクションで置く。 */}
-                {dockSection(
-                  "arexportview",
-                  <>
-                    <IconMove size={13} /> 操作
-                  </>,
-                  <div className="stage-controls">
-                    {exportModeToggle}
-                    {stageZoomControls}
-                  </div>,
-                )}
-                {/* 焼き込み設定: 山名ラベル・解説の表示、解説の取り上げ山、共通の文字サイズ。 */}
-                {arLabels.length > 0 && (
-                  <div className="ar-caption-ctrl">
-                    {/* === ラベル（折りたたみ） === */}
-                    <details className="ar-sec" open>
-                      <summary>ラベル</summary>
-                      <label className="switch-row">
+                {/* 操作（編集/画像 切替・ズーム）はステージ操作なので常時表示。 */}
+                <div className="stage-controls">
+                  {exportModeToggle}
+                  {stageZoomControls}
+                </div>
+                {/* 焼き込み設定: ラベル / 解説 をタブで1つだけ表示。 */}
+                {arLabels.length > 0 &&
+                  dockTabs("arexport", [
+                    {
+                      id: "label",
+                      label: "ラベル",
+                      content: (
+                        <>
+                          <label className="switch-row">
                         <span>写真に山名を入れる</span>
                         <input
                           type="checkbox"
@@ -3537,13 +3541,17 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                           )}
                         </>
                       )}
-                    </details>
-                    {/* === 解説（折りたたみ） === */}
-                    {arLabels.some((l) => l.description) && (
-                      <details className="ar-sec" open>
-                        <summary>解説</summary>
-                        <div className="ar-fs-row">
-                          <span>言語</span>
+                        </>
+                      ),
+                    },
+                    arLabels.some((l) => l.description)
+                      ? {
+                          id: "desc",
+                          label: "解説",
+                          content: (
+                            <>
+                              <div className="ar-fs-row">
+                                <span>言語</span>
                           <div className="seg" role="group" aria-label="解説の言語">
                             {(
                               [
@@ -3690,10 +3698,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             {fontRow("captionBody", "本文フォント")}
                           </>
                         )}
-                      </details>
-                    )}
-                  </div>
-                )}
+                            </>
+                          ),
+                        }
+                      : null,
+                  ])}
                 <div className="ar-dock-actions">
                   <button
                     className="ar-btn-sub ar-btn--icon"
@@ -3785,78 +3794,72 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                     : "選んだ山名が写真に重なります。ドラッグで向き、スライダーで目線高さ／傾きを合わせ込みます。",
                 )
               : null}
-          {/* 操作（3D/2D・地図/カメラ 等） */}
-          {viewSection}
-          {/* 内容 */}
-          {simView ? (
-            <>
-              {dockSection(
-                "camcfg",
-                <>
-                  <IconCamera size={13} /> カメラ設定
-                </>,
-                <>
-                  {cameraReadout}
-                  {eyeSlider}
-                  {fovSlider}
-                  {rollSlider}
-                </>,
-              )}
-              {showCelestial &&
-                dockSection(
-                  "celest",
-                  <>
-                    <IconSun size={13} /> 太陽・月
-                  </>,
-                  celestialControls,
-                )}
-            </>
-          ) : (
-            <>
-              {arLike && arStep === "align" && (
-                <div className="stage-controls">
-                  {editModeToggle}
-                  {stageZoomControls}
-                </div>
-              )}
-              {dockSection(
-                "aradjust",
-                <>
-                  <IconCamera size={13} /> カメラ設定
-                </>,
-                <>
-                  {cameraReadout}
-                  {eyeSlider}
-                  {appMode !== "live" && rollSlider}
-                  {appMode === "ar" &&
-                    (!photoUrl ? (
-                      <div className="cam-photo">
-                        <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
-                          <IconImage size={15} />
-                          <span>写真を重ねて合わせる</span>
-                        </button>
-                      </div>
-                    ) : (
-                      camSlider(
-                        <>
-                          写真の濃さ <i className="cam-eye-sub">シミュ ←→ 写真</i>
-                        </>,
-                        `${Math.round(photoOpacity * 100)}%`,
-                        <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
-                      )
-                    ))}
-                  {appMode === "live" &&
-                    camSlider(
-                      <>
-                        カメラ映像の濃さ <i className="cam-eye-sub">シミュ ←→ カメラ</i>
-                      </>,
-                      `${Math.round(photoOpacity * 100)}%`,
-                      <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
-                    )}
-                </>,
-              )}
-            </>
+          {/* align のみ: ステージ操作（合わせる/動かす + ズーム）は常時表示 */}
+          {!simView && arLike && arStep === "align" && (
+            <div className="stage-controls">
+              {editModeToggle}
+              {stageZoomControls}
+            </div>
           )}
+          {/* セクションはタブで1つだけ表示 */}
+          {simView
+            ? dockTabs("sim", [
+                viewTab,
+                {
+                  id: "cam",
+                  label: <><IconCamera size={13} /> カメラ設定</>,
+                  content: (
+                    <>
+                      {cameraReadout}
+                      {eyeSlider}
+                      {fovSlider}
+                      {rollSlider}
+                    </>
+                  ),
+                },
+                showCelestial
+                  ? { id: "sun", label: <><IconSun size={13} /> 太陽・月</>, content: celestialControls }
+                  : null,
+              ])
+            : dockTabs("align", [
+                viewTab,
+                {
+                  id: "cam",
+                  label: <><IconCamera size={13} /> カメラ設定</>,
+                  content: (
+                    <>
+                      {cameraReadout}
+                      {eyeSlider}
+                      {appMode !== "live" && rollSlider}
+                      {appMode === "ar" &&
+                        (!photoUrl ? (
+                          <div className="cam-photo">
+                            <button className="cam-photo-pick" onClick={() => photoInputRef.current?.click()}>
+                              <IconImage size={15} />
+                              <span>写真を重ねて合わせる</span>
+                            </button>
+                          </div>
+                        ) : (
+                          camSlider(
+                            <>
+                              写真の濃さ <i className="cam-eye-sub">シミュ ←→ 写真</i>
+                            </>,
+                            `${Math.round(photoOpacity * 100)}%`,
+                            <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
+                          )
+                        ))}
+                      {appMode === "live" &&
+                        camSlider(
+                          <>
+                            カメラ映像の濃さ <i className="cam-eye-sub">シミュ ←→ カメラ</i>
+                          </>,
+                          `${Math.round(photoOpacity * 100)}%`,
+                          <input type="range" min={0} max={100} value={Math.round(photoOpacity * 100)} onChange={(e) => setPhotoOpacity(Number(e.target.value) / 100)} />,
+                        )}
+                    </>
+                  ),
+                },
+              ])}
           {/* 進行ボタン（最下部） */}
           {appMode === "ar" && arStep === "align" && (
             <div className="ar-dock-actions">
@@ -3914,18 +3917,13 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           {modePanelOpen && (
             <div className="mode-dock-body">
               {announce(modeHint)}
-              {viewSection}
-              {dockSection("search", <><IconSearch size={13} /> 検索</>, searchPanel)}
-              {dockSection("basemap", <><IconMap size={13} /> 地図</>, basemapPanel)}
-              {showCelestial &&
-                dockSection(
-                  "celest",
-                  <>
-                    <IconSun size={13} /> 太陽・月
-                  </>,
-                  celestialControls,
-                )}
-              {isOffline && dockSection("save", <><IconDownload size={13} /> オフライン保存</>, offlineControls)}
+              {dockTabs("mode", [
+                viewTab,
+                { id: "search", label: <><IconSearch size={13} /> 検索</>, content: searchPanel },
+                { id: "basemap", label: <><IconMap size={13} /> 地図</>, content: basemapPanel },
+                showCelestial ? { id: "celest", label: <><IconSun size={13} /> 太陽・月</>, content: celestialControls } : null,
+                isOffline ? { id: "save", label: <><IconDownload size={13} /> オフライン保存</>, content: offlineControls } : null,
+              ])}
             </div>
           )}
         </div>

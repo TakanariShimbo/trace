@@ -487,51 +487,55 @@ body,
   border-color: transparent;
 }
 /* ドック本体のセクション（見出し＋区切り線）。ボリュームのある中身を整理。 */
-.dock-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(130, 150, 175, 0.16);
-}
-.dock-section-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #8fa2bb;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-/* モードのアナウンス（タイトル直下の短い案内）。 */
-/* アナウンス（案内）セクションの本文。 */
-.hint-text {
+/* アナウンス（タイトル直下の本文のみ。見出しなし）。 */
+.dock-announce {
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
   color: #b9c6d8;
 }
-/* 折りたたみ用の見出しボタン（クリックで開閉）。左の開閉キャレットで「押せる行」だと明示。 */
-.dock-section-head {
+/* セクションをタブ化。タブで選んだ1項目だけ本体を表示（縦長対策）。 */
+.dock-tabwrap {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(130, 150, 175, 0.16);
+}
+.dock-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dock-tab {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 0;
-  background: transparent;
-  border: none;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b9c6d8;
+  background: rgba(40, 52, 68, 0.5);
+  border: 1px solid rgba(130, 150, 175, 0.25);
+  border-radius: 8px;
   cursor: pointer;
 }
-.dock-section-head > svg {
+.dock-tab > svg {
   color: #8fa2bb;
   flex: none;
 }
-/* 中身は見出しのラベル位置に揃えて字下げし、見出しの下にぶら下げる。 */
-.dock-section-body {
+.dock-tab.is-active {
+  color: #0a0d12;
+  background: rgba(143, 194, 255, 0.92);
+  border-color: rgba(143, 194, 255, 0.92);
+}
+.dock-tab.is-active > svg {
+  color: #0a0d12;
+}
+.dock-tab-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding-left: 18px;
 }
 /* モードドックのグリップ内タイトル（太陽/保存/地図 のラベル）。 */
 .mode-panel-title {
