@@ -2084,11 +2084,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         dotV: p.v,
         labelU: p.u,
         labelV: Math.max(0.06, p.v - 0.12), // 名札は点の少し上を初期位置に
-        description: d?.extract,
-        descriptionShort: d?.extractShort,
-        descriptionEn: d?.extractEn,
-        descriptionEnShort: d?.extractEnShort,
-        nameEn: d?.nameEn,
+        description: d?.description_ja_long,
+        descriptionShort: d?.description_ja_short,
+        descriptionEn: d?.description_en_long,
+        descriptionEnShort: d?.description_en_short,
+        nameEn: d?.title_en,
         source: d?.url,
       };
     });
