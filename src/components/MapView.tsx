@@ -489,7 +489,43 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // セクションの折りたたみ/パネル移動では更新しない（写真がそれに追従しないように）。
   const arPanelReserveRef = useRef(150);
   const appModeRef = useRef(appMode); // ループから appMode を参照（マウント中は不変）
-  const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の写真枠（座標換算用）
+  const arEditStageRef = useRef<HTMLDivElement | null>(null); // 仕上げ画面の外枠（写真比・3D連動）
+  const arFrameRef = useRef<HTMLDivElement | null>(null); // 出力枠（フレーム）。座標換算・cqmaxの基準
+  const [photoNat, setPhotoNat] = useState<{ w: number; h: number } | null>(null); // 写真の自然サイズ（出力枠アスペクト計算用）
+  // フレーム（出力枠）プレビュー幾何。既定（切り抜き0・余白0）では 枠=写真 と一致。
+  const fCwF = Math.max(0.1, 1 - cropInset.l - cropInset.r);
+  const fChF = Math.max(0.1, 1 - cropInset.t - cropInset.b);
+  const fMlr = frameMargin.l + frameMargin.r;
+  const fMtb = frameMargin.t + frameMargin.b;
+  const fAnyMargin = fMtb > 0 || fMlr > 0;
+  const fPhotoAR = photoNat ? photoNat.w / photoNat.h : 1;
+  const frameAR = fPhotoAR * (fCwF / fChF) * ((1 + fMlr) / (1 + fMtb)); // 出力枠アスペクト
+  const framePhotoStyle: React.CSSProperties = {
+    position: "absolute",
+    left: `${(frameMargin.l / (1 + fMlr)) * 100}%`,
+    top: `${(frameMargin.t / (1 + fMtb)) * 100}%`,
+    width: `${(1 / (1 + fMlr)) * 100}%`,
+    height: `${(1 / (1 + fMtb)) * 100}%`,
+    overflow: "hidden",
+  };
+  const frameCropImgStyle: React.CSSProperties = {
+    position: "absolute",
+    width: `${(1 / fCwF) * 100}%`,
+    height: `${(1 / fChF) * 100}%`,
+    left: `${(-cropInset.l / fCwF) * 100}%`,
+    top: `${(-cropInset.t / fChF) * 100}%`,
+  };
+  // ふち（フェード）。余白のある辺だけ、写真領域の内側へ frameFade ぶん余白色へ溶かす。
+  const fadeStyle = (dir: "t" | "b" | "l" | "r"): React.CSSProperties | null => {
+    if (frameFade <= 0 || frameMargin[dir] <= 0) return null;
+    const c = frameMarginColor;
+    const pct = `${frameFade * 100}%`;
+    const base: React.CSSProperties = { position: "absolute", pointerEvents: "none" };
+    if (dir === "t") return { ...base, left: 0, right: 0, top: 0, height: pct, background: `linear-gradient(to bottom, ${c}, transparent)` };
+    if (dir === "b") return { ...base, left: 0, right: 0, bottom: 0, height: pct, background: `linear-gradient(to top, ${c}, transparent)` };
+    if (dir === "l") return { ...base, top: 0, bottom: 0, left: 0, width: pct, background: `linear-gradient(to right, ${c}, transparent)` };
+    return { ...base, top: 0, bottom: 0, right: 0, width: pct, background: `linear-gradient(to left, ${c}, transparent)` };
+  };
   const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
@@ -1916,7 +1952,6 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     await img.decode();
     const W = img.naturalWidth;
     const H = img.naturalHeight;
-    const L = Math.max(W, H); // 文字サイズは写真の長辺基準（切り抜き・余白に依らず一定）
     // フレーム: 切り抜き(crop)→余白(margin)→ふち(fade)。出力枠 OW×OH を作る。既定では従来と同一。
     const cl = cropInset.l * W, ct = cropInset.t * H;
     const cw = Math.max(1, W * (1 - cropInset.l - cropInset.r));
@@ -1924,7 +1959,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const cwR = Math.round(cw), chR = Math.round(ch);
     const mT = Math.round(frameMargin.t * chR), mB = Math.round(frameMargin.b * chR);
     const mL = Math.round(frameMargin.l * cwR), mR = Math.round(frameMargin.r * cwR);
-    const OW = cwR + mL + mR, OH = chR + mT + mB; // 出力枠（ラベル位置の基準）
+    const OW = cwR + mL + mR, OH = chR + mT + mB; // 出力枠（ラベル位置・文字サイズの基準）
+    const L = Math.max(OW, OH); // 文字サイズは出力枠の長辺基準（プレビューの cqmax と一致）
     const canvas = document.createElement("canvas");
     canvas.width = OW;
     canvas.height = OH;
@@ -2354,7 +2390,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     e.preventDefault();
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-    const stage = arEditStageRef.current;
+    const stage = arFrameRef.current;
     if (stage) {
       const r = stage.getBoundingClientRect();
       const pu = (e.clientX - r.left) / r.width;
@@ -2377,7 +2413,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         : cl.contains("ar-cap-handle--b")
           ? "b"
           : "r";
-    const r = arEditStageRef.current?.getBoundingClientRect();
+    const r = arFrameRef.current?.getBoundingClientRect();
     capResizeRef.current = {
       side,
       startW: captionW,
@@ -2421,7 +2457,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   };
   const onEditMove = (e: React.PointerEvent) => {
     const d = arDragRef.current;
-    const stage = arEditStageRef.current;
+    const stage = arFrameRef.current;
     if (!d || !stage) return;
     const r = stage.getBoundingClientRect();
     const u = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
@@ -2483,10 +2519,27 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   const onEditUp = () => {
     arDragRef.current = null;
   };
+  // 出力枠(フレーム)を、外枠(ステージ)内に「contain」で収める px サイズに設定。
+  useLayoutEffect(() => {
+    const stageEl = arEditStageRef.current,
+      frame = arFrameRef.current;
+    if (!stageEl || !frame) return;
+    const sw = stageEl.clientWidth,
+      sh = stageEl.clientHeight;
+    if (!sw || !sh || !frameAR) return;
+    let w = sw,
+      h = sw / frameAR;
+    if (h > sh) {
+      h = sh;
+      w = sh * frameAR;
+    }
+    frame.style.width = `${Math.round(w)}px`;
+    frame.style.height = `${Math.round(h)}px`;
+  }, [frameAR, measureTick, arStep, arExportMode]);
   // ラベル実寸を測って正規化で保持（引き出し線の辺アンカー計算に使う）。
   // 位置(labelU/V)ドラッグでは寸法は変わらないので、変化時のみ state を更新。
   useLayoutEffect(() => {
-    const stage = arEditStageRef.current;
+    const stage = arFrameRef.current;
     if (!stage) return;
     const r = stage.getBoundingClientRect();
     if (!r.width || !r.height) return;
@@ -3315,19 +3368,31 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               } as React.CSSProperties
             }
           >
-            {photoUrl && <img className="ar-edit-photo" src={photoUrl} alt="" draggable={false} />}
-            {/* 切り抜きプレビュー（残す範囲を枠で表示。外側を暗く）。出力では余白・ふちも反映。 */}
-            {(cropInset.l > 0 || cropInset.t > 0 || cropInset.r > 0 || cropInset.b > 0) && (
-              <div
-                className="ar-crop-rect"
-                style={{
-                  left: `${cropInset.l * 100}%`,
-                  top: `${cropInset.t * 100}%`,
-                  right: `${cropInset.r * 100}%`,
-                  bottom: `${cropInset.b * 100}%`,
-                }}
-              />
-            )}
+            {/* 出力枠（フレーム）。切り抜き・余白・ふちを反映。ラベル/解説はこの枠基準。 */}
+            <div
+              className="ar-frame"
+              ref={arFrameRef}
+              style={{ background: fAnyMargin ? frameMarginColor : "#000" }}
+            >
+              <div className="ar-frame-photo" style={framePhotoStyle}>
+                {photoUrl && (
+                  <img
+                    className="ar-edit-photo"
+                    src={photoUrl}
+                    alt=""
+                    draggable={false}
+                    style={frameCropImgStyle}
+                    onLoad={(e) => {
+                      const im = e.currentTarget;
+                      if (im.naturalWidth) setPhotoNat({ w: im.naturalWidth, h: im.naturalHeight });
+                    }}
+                  />
+                )}
+                {(["t", "b", "l", "r"] as const).map((d) => {
+                  const s = fadeStyle(d);
+                  return s ? <div key={d} style={s} /> : null;
+                })}
+              </div>
             {/* 山名ラベル（表示ONのときだけ。引き出し線＋点＋名札） */}
             {bakeLabels && (
               <>
@@ -3520,6 +3585,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   ))}
                 </div>
               )}
+            </div>
           </div>
           <div
             className="cam-hud"

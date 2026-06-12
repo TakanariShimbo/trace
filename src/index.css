@@ -1708,9 +1708,19 @@ body,
   background: #000;
   overflow: hidden;
   touch-action: none;
-  /* 文字サイズを写真（このステージ）の長辺基準にするためのコンテナ。
-     子は cqmax（=長辺の1%）で指定すると、画面サイズに依存せず写真比で一定になる。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 出力枠（フレーム）。切り抜き・余白・ふちを反映。px サイズは JS で contain 設定。
+   文字サイズの cqmax（=長辺の1%）基準＝この出力枠。 */
+.ar-frame {
+  position: relative;
+  overflow: hidden;
   container-type: size;
+}
+.ar-frame-photo {
+  position: absolute; /* 位置・サイズは inline（余白）。中の写真は inline（切り抜き）。 */
 }
 .ar-edit-photo {
   display: block;
