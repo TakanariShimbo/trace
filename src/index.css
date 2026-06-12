@@ -1793,6 +1793,16 @@ body,
   border-radius: 0.8cqmax;
   pointer-events: none;
 }
+/* 背景パネル（なし/半透明/不透明）。選択枠と同じ範囲に文字の下へ敷く。出力にも焼き込む。 */
+.ar-edit-label.has-panel::after {
+  content: "";
+  position: absolute;
+  inset: -0.8cqmax -1.2cqmax;
+  background: var(--label-panel-bg);
+  border: 0.12cqmax solid var(--label-panel-bd, transparent);
+  border-radius: 0.8cqmax;
+  z-index: -1; /* 文字の下 */
+}
 .ar-label-name {
   font-family: var(--label-name-ff, inherit);
   font-size: calc(2.7cqmax * var(--label-name-fs, 1));
@@ -1821,6 +1831,19 @@ body,
 }
 .ar-caption:active {
   cursor: grabbing;
+}
+/* 背景パネル（なし/半透明/不透明）。本文の下に敷く。 */
+.ar-caption.has-panel {
+  isolation: isolate; /* ::before z-index:-1 を内部に閉じる */
+}
+.ar-caption.has-panel::before {
+  content: "";
+  position: absolute;
+  inset: -1.2cqmax -1.4cqmax;
+  background: var(--cap-panel-bg);
+  border: 0.12cqmax solid var(--cap-panel-bd, transparent);
+  border-radius: 1.2cqmax;
+  z-index: -1;
 }
 /* 「画像」モード中は注釈（名札・点・解説）を透過させ、写真のパン/ズームを優先。編集UIも隠す。 */
 .ar-edit-stage.is-image-mode .ar-edit-label,

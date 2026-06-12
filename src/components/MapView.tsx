@@ -148,6 +148,15 @@ const PREF_EN: Record<string, string> = {
 const prefEn = (pref: string) =>
   pref.split("/").map((p) => PREF_EN[p.trim()] ?? p.trim().replace(/[県府都道]$/, "")).join(" / ");
 
+// 背景パネルの塗り色（文字色の反対色）。translucent=半透明 / solid=不透明。
+type BgPanel = "none" | "translucent" | "solid";
+const panelFill = (textColor: string, mode: "translucent" | "solid") => {
+  const dark = textColor !== "#000000"; // 白文字→濃色パネル、黒文字→淡色パネル
+  if (dark) return mode === "solid" ? "rgba(12,16,22,0.95)" : "rgba(12,16,22,0.5)";
+  return mode === "solid" ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.62)";
+};
+const panelStroke = (textColor: string) => (textColor !== "#000000" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.16)");
+
 // ラベルの内容パターン（1段目=主名／2段目=補足の組み合わせ）。
 type LabelMode = "jaSubEnElev" | "jaSubEn" | "jaSubElev" | "enSubElev" | "jaOnly" | "enOnly";
 
@@ -458,6 +467,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // 文字色。ラベルと解説で別々。
   const [labelColor, setLabelColor] = useState("#ffffff");
   const [captionColor, setCaptionColor] = useState("#ffffff");
+  // 背景パネル（なし / 半透明 / 不透明）。ラベルと解説で別々。背景色は文字色の反対色。
+  const [labelBg, setLabelBg] = useState<BgPanel>("none");
+  const [captionBg, setCaptionBg] = useState<BgPanel>("none");
   // 解説ブロックの配置（写真フレーム内の正規化座標。ブロック左上）。ドラッグで移動。
   const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
   const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
@@ -1967,7 +1979,19 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.lineTo(ax + (bx - ax) * 0.83, ay + (by - ay) * 0.83);
         ctx.stroke();
         ctx.globalAlpha = 1;
-        // 文字（背景なし・中央揃え・影は文字色の反対色で可読性確保。黒文字の白影は控えめ）
+        // 背景パネル（選択枠と同じ範囲。文字の下に敷く）。
+        if (labelBg !== "none") {
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(cx - boxW / 2 - padH, boxTop - padV, boxW + padH * 2, boxBottom - boxTop + padV * 2, Math.round(L * 0.008));
+          ctx.fillStyle = panelFill(labelColor, labelBg);
+          ctx.fill();
+          ctx.lineWidth = Math.max(1, L * 0.0012);
+          ctx.strokeStyle = panelStroke(labelColor);
+          ctx.stroke();
+          ctx.restore();
+        }
+        // 文字（中央揃え・影は文字色の反対色で可読性確保。黒文字の白影は控えめ）
         ctx.save();
         ctx.shadowColor = labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)";
         ctx.shadowBlur = Math.round(L * 0.0035);
@@ -2146,7 +2170,20 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const blockH = bodyBlockH;
         const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
         const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
-        // 影で可読性を確保（背景ボックスなし）。影は文字色の反対色（黒文字の白影は控えめ）。
+        // 背景パネル（本文ブロックの下に敷く）。
+        if (captionBg !== "none") {
+          const px = Math.round(L * 0.014), py = Math.round(L * 0.012);
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(bx - px, by - py, blockW + px * 2, bodyBlockH + py * 2, Math.round(L * 0.012));
+          ctx.fillStyle = panelFill(captionColor, captionBg);
+          ctx.fill();
+          ctx.lineWidth = Math.max(1, L * 0.0012);
+          ctx.strokeStyle = panelStroke(captionColor);
+          ctx.stroke();
+          ctx.restore();
+        }
+        // 影で可読性を確保。影は文字色の反対色（黒文字の白影は控えめ）。
         ctx.save();
         ctx.shadowColor = captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)";
         ctx.shadowBlur = Math.round(L * 0.004);
@@ -3323,7 +3360,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                   return (
                     <div
                       key={i}
-                      className="ar-edit-label"
+                      className={`ar-edit-label${labelBg !== "none" ? " has-panel" : ""}`}
                       data-idx={i}
                       style={
                         {
@@ -3331,6 +3368,12 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                           top: `${lb.labelV * 100}%`,
                           color: labelColor,
                           "--label-sh": labelColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.82)",
+                          ...(labelBg !== "none"
+                            ? {
+                                "--label-panel-bg": panelFill(labelColor, labelBg),
+                                "--label-panel-bd": panelStroke(labelColor),
+                              }
+                            : {}),
                         } as React.CSSProperties
                       }
                       onPointerDown={onEditDown(i, "label")}
@@ -3349,7 +3392,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
               arLabels[captionIdx] &&
               (arLabels[captionIdx].description || arLabels[captionIdx].descriptionEn) && (
                 <div
-                  className="ar-caption"
+                  className={`ar-caption${captionBg !== "none" ? " has-panel" : ""}`}
                   style={
                     {
                       left: `${captionPos.u * 100}%`,
@@ -3358,6 +3401,12 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                       color: captionColor,
                       "--cap-sh": captionColor === "#000000" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.85)",
                       "--cap-tag-bg": captionColor === "#000000" ? "rgba(255,255,255,0.62)" : "rgba(0,0,0,0.4)",
+                      ...(captionBg !== "none"
+                        ? {
+                            "--cap-panel-bg": panelFill(captionColor, captionBg),
+                            "--cap-panel-bd": panelStroke(captionColor),
+                          }
+                        : {}),
                     } as React.CSSProperties
                   }
                   onPointerDown={onCaptionDown}
@@ -3502,6 +3551,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         label: "ラベル表示",
                         content: (
                           <>
+                            <div className="ar-fs-row">
+                              <span>背景パネル</span>
+                              <div className="seg" role="group" aria-label="背景パネル">
+                                {([["なし", "none"], ["半透明", "translucent"], ["不透明", "solid"]] as [string, BgPanel][]).map(([lab, v]) => (
+                                  <button key={v} className={labelBg === v ? "is-active" : ""} onClick={() => setLabelBg(v)}>
+                                    {lab}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                             <div className="ar-fs-row">
                               <span>名前の色</span>
                               <div className="seg" role="group" aria-label="名前の色">
@@ -3669,6 +3728,16 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                                 </div>
                               </div>
                             )}
+                            <div className="ar-fs-row">
+                              <span>背景パネル</span>
+                              <div className="seg" role="group" aria-label="背景パネル">
+                                {([["なし", "none"], ["半透明", "translucent"], ["不透明", "solid"]] as [string, BgPanel][]).map(([lab, v]) => (
+                                  <button key={v} className={captionBg === v ? "is-active" : ""} onClick={() => setCaptionBg(v)}>
+                                    {lab}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                             <div className="ar-fs-row">
                               <span>解説の色</span>
                               <div className="seg" role="group" aria-label="解説の色">
