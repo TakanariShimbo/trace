@@ -1799,8 +1799,9 @@ body,
   position: absolute;
   inset: -0.8cqmax -1.2cqmax;
   background: var(--label-panel-bg);
-  border: 0.12cqmax solid var(--label-panel-bd, transparent);
-  border-radius: 0.8cqmax;
+  border: 0.1cqmax solid var(--label-panel-bd, transparent);
+  border-radius: 1.1cqmax;
+  box-shadow: 0 0.5cqmax 1.4cqmax rgba(0, 0, 0, 0.28);
   z-index: -1; /* 文字の下 */
 }
 .ar-label-name {
@@ -1839,10 +1840,11 @@ body,
 .ar-caption.has-panel::before {
   content: "";
   position: absolute;
-  inset: -1.2cqmax -1.4cqmax;
+  inset: -1.5cqmax -1.8cqmax;
   background: var(--cap-panel-bg);
-  border: 0.12cqmax solid var(--cap-panel-bd, transparent);
-  border-radius: 1.2cqmax;
+  border: 0.1cqmax solid var(--cap-panel-bd, transparent);
+  border-radius: 1.6cqmax;
+  box-shadow: 0 0.6cqmax 1.8cqmax rgba(0, 0, 0, 0.3);
   z-index: -1;
 }
 /* 「画像」モード中は注釈（名札・点・解説）を透過させ、写真のパン/ズームを優先。編集UIも隠す。 */

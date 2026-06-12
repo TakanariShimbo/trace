@@ -152,10 +152,10 @@ const prefEn = (pref: string) =>
 type BgPanel = "none" | "translucent" | "solid";
 const panelFill = (textColor: string, mode: "translucent" | "solid") => {
   const dark = textColor !== "#000000"; // 白文字→濃色パネル、黒文字→淡色パネル
-  if (dark) return mode === "solid" ? "rgba(12,16,22,0.95)" : "rgba(12,16,22,0.5)";
-  return mode === "solid" ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.62)";
+  if (dark) return mode === "solid" ? "rgba(17,21,29,0.96)" : "rgba(17,21,29,0.42)";
+  return mode === "solid" ? "rgba(252,252,253,0.97)" : "rgba(255,255,255,0.55)";
 };
-const panelStroke = (textColor: string) => (textColor !== "#000000" ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.16)");
+const panelStroke = (textColor: string) => (textColor !== "#000000" ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.10)");
 
 // ラベルの内容パターン（1段目=主名／2段目=補足の組み合わせ）。
 type LabelMode = "jaSubEnElev" | "jaSubEn" | "jaSubElev" | "enSubElev" | "jaOnly" | "enOnly";
@@ -1928,6 +1928,22 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     const ffSub = roleFontStack(roleFonts.labelSub);
     const ffTitle = roleFontStack(roleFonts.captionTitle);
     const ffBody = roleFontStack(roleFonts.captionBody);
+    // 背景パネルを描く（ドロップシャドウ＋角丸＋うっすら枠線）。文字の下に敷く。
+    const drawPanel = (x: number, y: number, w: number, h: number, r: number, textColor: string, mode: "translucent" | "solid") => {
+      ctx.save();
+      ctx.shadowColor = mode === "solid" ? "rgba(0,0,0,0.34)" : "rgba(0,0,0,0.26)";
+      ctx.shadowBlur = Math.round(L * 0.012);
+      ctx.shadowOffsetY = Math.round(L * 0.0045);
+      ctx.fillStyle = panelFill(textColor, mode);
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.fill();
+      ctx.shadowColor = "transparent"; // 枠線には影を載せない
+      ctx.lineWidth = Math.max(1, Math.round(L * 0.0009));
+      ctx.strokeStyle = panelStroke(textColor);
+      ctx.stroke();
+      ctx.restore();
+    };
     // canvas はフォント未ロードだと既定にフォールバックするため、使うフォントを先に読み込む。
     const fontLoads: Promise<unknown>[] = [];
     for (const [w, id] of [
@@ -1981,15 +1997,7 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         ctx.globalAlpha = 1;
         // 背景パネル（選択枠と同じ範囲。文字の下に敷く）。
         if (labelBg !== "none") {
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(cx - boxW / 2 - padH, boxTop - padV, boxW + padH * 2, boxBottom - boxTop + padV * 2, Math.round(L * 0.008));
-          ctx.fillStyle = panelFill(labelColor, labelBg);
-          ctx.fill();
-          ctx.lineWidth = Math.max(1, L * 0.0012);
-          ctx.strokeStyle = panelStroke(labelColor);
-          ctx.stroke();
-          ctx.restore();
+          drawPanel(cx - boxW / 2 - padH, boxTop - padV, boxW + padH * 2, boxBottom - boxTop + padV * 2, Math.round(L * 0.011), labelColor, labelBg);
         }
         // 文字（中央揃え・影は文字色の反対色で可読性確保。黒文字の白影は控えめ）
         ctx.save();
@@ -2172,16 +2180,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
         // 背景パネル（本文ブロックの下に敷く）。
         if (captionBg !== "none") {
-          const px = Math.round(L * 0.014), py = Math.round(L * 0.012);
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(bx - px, by - py, blockW + px * 2, bodyBlockH + py * 2, Math.round(L * 0.012));
-          ctx.fillStyle = panelFill(captionColor, captionBg);
-          ctx.fill();
-          ctx.lineWidth = Math.max(1, L * 0.0012);
-          ctx.strokeStyle = panelStroke(captionColor);
-          ctx.stroke();
-          ctx.restore();
+          const px = Math.round(L * 0.018), py = Math.round(L * 0.015);
+          drawPanel(bx - px, by - py, blockW + px * 2, bodyBlockH + py * 2, Math.round(L * 0.016), captionColor, captionBg);
         }
         // 影で可読性を確保。影は文字色の反対色（黒文字の白影は控えめ）。
         ctx.save();
