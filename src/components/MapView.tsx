@@ -3460,200 +3460,215 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                 {dockTabs("arexport", [
                   arLabels.length > 0
                     ? {
-                      id: "label",
-                      label: "ラベル",
-                      content: (
-                        <>
-                          <label className="switch-row">
-                        <span>写真に山名を入れる</span>
-                        <input
-                          type="checkbox"
-                          className="switch"
-                          checked={bakeLabels}
-                          onChange={(e) => setBakeLabels(e.target.checked)}
-                        />
-                      </label>
-                      {bakeLabels && (
-                        <>
-                          <div className="ar-fs-row">
-                            <span>表示</span>
-                            <div className="ar-font-sel">
-                              <select
-                                value={labelMode}
-                                onChange={(e) => setLabelMode(e.target.value as LabelMode)}
-                                aria-label="ラベルの表示内容"
-                              >
-                                <option value="jaSubEnElev">日本語名 ＋ 英語名・標高</option>
-                                <option value="jaSubEn">日本語名 ＋ 英語名</option>
-                                <option value="jaSubElev">日本語名 ＋ 標高</option>
-                                <option value="enSubElev">英語名 ＋ 標高</option>
-                                <option value="jaOnly">日本語名のみ</option>
-                                <option value="enOnly">英語名のみ</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div className="ar-fs-row">
-                            <span>名前の色</span>
-                            <div className="seg" role="group" aria-label="名前の色">
-                              {([["白", "#ffffff"], ["黒", "#000000"]] as [string, string][]).map(([lab, v]) => (
-                                <button key={v} className={labelColor === v ? "is-active" : ""} onClick={() => setLabelColor(v)}>
-                                  {lab}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="ar-fs-slider-row">
-                            <span>山名サイズ</span>
-                            <span className="ar-fs-val">{Math.round(labelNameScale * 100)}%</span>
-                          </div>
-                          <input
-                            type="range"
-                            className="ar-fs-slider"
-                            min={0.7}
-                            max={2.0}
-                            step={0.05}
-                            value={labelNameScale}
-                            onChange={(e) => setLabelNameScale(Number(e.target.value))}
-                            aria-label="山名サイズ"
-                          />
-                          {fontRow("labelName", "山名フォント")}
-                          {labelHasSub && (
-                            <>
-                              <div className="ar-fs-slider-row">
-                                <span>補足サイズ</span>
-                                <span className="ar-fs-val">{Math.round(labelSubScale * 100)}%</span>
-                              </div>
+                        id: "labelContent",
+                        label: "ラベル内容",
+                        content: (
+                          <>
+                            <label className="switch-row">
+                              <span>写真に山名を入れる</span>
                               <input
-                                type="range"
-                                className="ar-fs-slider"
-                                min={0.7}
-                                max={1.6}
-                                step={0.05}
-                                value={labelSubScale}
-                                onChange={(e) => setLabelSubScale(Number(e.target.value))}
-                                aria-label="補足サイズ"
+                                type="checkbox"
+                                className="switch"
+                                checked={bakeLabels}
+                                onChange={(e) => setBakeLabels(e.target.checked)}
                               />
-                              {fontRow("labelSub", "補足フォント")}
-                            </>
-                          )}
-                        </>
-                      )}
-                        </>
-                      ),
-                    }
-                    : null,
-                  arLabels.some((l) => l.description)
-                      ? {
-                          id: "desc",
-                          label: "解説",
-                          content: (
-                            <>
+                            </label>
+                            {bakeLabels && (
                               <div className="ar-fs-row">
-                                <span>言語</span>
-                          <div className="seg" role="group" aria-label="解説の言語">
-                            {(
-                              [
-                                ["日本語", "ja"],
-                                ["英語", "en"],
-                                ["両方", "both"],
-                                ["なし", "none"],
-                              ] as [string, "ja" | "en" | "both" | "none"][]
-                            ).map(([lab, v]) => (
-                              <button key={v} className={captionLang === v ? "is-active" : ""} onClick={() => setCaptionLang(v)}>
-                                {lab}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {captionLang !== "none" && (
-                          <div className="ar-fs-row">
-                            <span>長さ</span>
-                            <div className="seg" role="group" aria-label="解説の長さ">
-                              {([["短め", "short"], ["長め", "long"]] as [string, "short" | "long"][]).map(([lab, v]) => (
-                                <button key={v} className={captionLength === v ? "is-active" : ""} onClick={() => setCaptionLength(v)}>
-                                  {lab}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {captionLang !== "none" && (
+                                <span>表示</span>
+                                <div className="ar-font-sel">
+                                  <select
+                                    value={labelMode}
+                                    onChange={(e) => setLabelMode(e.target.value as LabelMode)}
+                                    aria-label="ラベルの表示内容"
+                                  >
+                                    <option value="jaSubEnElev">日本語名 ＋ 英語名・標高</option>
+                                    <option value="jaSubEn">日本語名 ＋ 英語名</option>
+                                    <option value="jaSubElev">日本語名 ＋ 標高</option>
+                                    <option value="enSubElev">英語名 ＋ 標高</option>
+                                    <option value="jaOnly">日本語名のみ</option>
+                                    <option value="enOnly">英語名のみ</option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ),
+                      }
+                    : null,
+                  arLabels.length > 0 && bakeLabels
+                    ? {
+                        id: "labelStyle",
+                        label: "ラベル表示",
+                        content: (
                           <>
                             <div className="ar-fs-row">
-                              <span>タグ</span>
+                              <span>名前の色</span>
+                              <div className="seg" role="group" aria-label="名前の色">
+                                {([["白", "#ffffff"], ["黒", "#000000"]] as [string, string][]).map(([lab, v]) => (
+                                  <button key={v} className={labelColor === v ? "is-active" : ""} onClick={() => setLabelColor(v)}>
+                                    {lab}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                            <div className="ar-caption-pick">
-                              <button
-                                className={`ar-cap-chip${capShowElev ? " is-on" : ""}`}
-                                onClick={() => setCapShowElev((v) => !v)}
-                              >
-                                高さ
-                              </button>
-                              <button
-                                className={`ar-cap-chip${capShowLoc ? " is-on" : ""}`}
-                                onClick={() => setCapShowLoc((v) => !v)}
-                              >
-                                場所
-                              </button>
-                              {(capItem?.tagsJa ?? []).map((t) => (
-                                <button
-                                  key={t}
-                                  className={`ar-cap-chip${capSelectedTags.includes(t) ? " is-on" : ""}`}
-                                  onClick={() => toggleCapTag(t)}
-                                >
-                                  {t}
-                                </button>
-                              ))}
+                            <div className="ar-fs-slider-row">
+                              <span>山名サイズ</span>
+                              <span className="ar-fs-val">{Math.round(labelNameScale * 100)}%</span>
                             </div>
-                          </>
-                        )}
-                        {captionLang === "both" && (
-                          <div className="ar-fs-row">
-                            <span>並べ方</span>
-                            <div className="seg" role="group" aria-label="日英の並べ方">
-                              {([["横", "horizontal"], ["縦", "vertical"]] as [string, "horizontal" | "vertical"][]).map(([lab, v]) => (
-                                <button key={v} className={captionLayout === v ? "is-active" : ""} onClick={() => setCaptionLayout(v)}>
-                                  {lab}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {captionLang === "both" && (
-                          <div className="ar-fs-row">
-                            <span>見出し</span>
-                            <div className="ar-font-sel">
-                              <select
-                                value={captionTitleMode}
-                                onChange={(e) => setCaptionTitleMode(e.target.value as "each" | "groupV" | "groupH" | "ja" | "en")}
-                                aria-label="見出しの出し方"
-                              >
-                                <option value="each">本文ごと</option>
-                                <option value="groupV">まとめる（上下）</option>
-                                <option value="groupH">まとめる（左右）</option>
-                                <option value="ja">日本語のみ</option>
-                                <option value="en">英語のみ</option>
-                              </select>
-                            </div>
-                          </div>
-                        )}
-                        {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
-                          <div className="ar-caption-pick">
-                            {arLabels.map((l, i) =>
-                              l.description ? (
-                                <button
-                                  key={i}
-                                  className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
-                                  onClick={() => setCaptionIdx(i)}
-                                >
-                                  {l.name}
-                                </button>
-                              ) : null,
+                            <input
+                              type="range"
+                              className="ar-fs-slider"
+                              min={0.7}
+                              max={2.0}
+                              step={0.05}
+                              value={labelNameScale}
+                              onChange={(e) => setLabelNameScale(Number(e.target.value))}
+                              aria-label="山名サイズ"
+                            />
+                            {fontRow("labelName", "山名フォント")}
+                            {labelHasSub && (
+                              <>
+                                <div className="ar-fs-slider-row">
+                                  <span>補足サイズ</span>
+                                  <span className="ar-fs-val">{Math.round(labelSubScale * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  className="ar-fs-slider"
+                                  min={0.7}
+                                  max={1.6}
+                                  step={0.05}
+                                  value={labelSubScale}
+                                  onChange={(e) => setLabelSubScale(Number(e.target.value))}
+                                  aria-label="補足サイズ"
+                                />
+                                {fontRow("labelSub", "補足フォント")}
+                              </>
                             )}
-                          </div>
-                        )}
-                        {bakeCaption && (
+                          </>
+                        ),
+                      }
+                    : null,
+                  arLabels.some((l) => l.description)
+                    ? {
+                        id: "descContent",
+                        label: "解説内容",
+                        content: (
                           <>
+                            <div className="ar-fs-row">
+                              <span>言語</span>
+                              <div className="seg" role="group" aria-label="解説の言語">
+                                {(
+                                  [
+                                    ["日本語", "ja"],
+                                    ["英語", "en"],
+                                    ["両方", "both"],
+                                    ["なし", "none"],
+                                  ] as [string, "ja" | "en" | "both" | "none"][]
+                                ).map(([lab, v]) => (
+                                  <button key={v} className={captionLang === v ? "is-active" : ""} onClick={() => setCaptionLang(v)}>
+                                    {lab}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                            {captionLang !== "none" && (
+                              <div className="ar-fs-row">
+                                <span>長さ</span>
+                                <div className="seg" role="group" aria-label="解説の長さ">
+                                  {([["短め", "short"], ["長め", "long"]] as [string, "short" | "long"][]).map(([lab, v]) => (
+                                    <button key={v} className={captionLength === v ? "is-active" : ""} onClick={() => setCaptionLength(v)}>
+                                      {lab}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {captionLang !== "none" && (
+                              <>
+                                <div className="ar-fs-row">
+                                  <span>タグ</span>
+                                </div>
+                                <div className="ar-caption-pick">
+                                  <button className={`ar-cap-chip${capShowElev ? " is-on" : ""}`} onClick={() => setCapShowElev((v) => !v)}>
+                                    高さ
+                                  </button>
+                                  <button className={`ar-cap-chip${capShowLoc ? " is-on" : ""}`} onClick={() => setCapShowLoc((v) => !v)}>
+                                    場所
+                                  </button>
+                                  {(capItem?.tagsJa ?? []).map((t) => (
+                                    <button
+                                      key={t}
+                                      className={`ar-cap-chip${capSelectedTags.includes(t) ? " is-on" : ""}`}
+                                      onClick={() => toggleCapTag(t)}
+                                    >
+                                      {t}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                            {bakeCaption && arLabels.filter((l) => l.description).length > 1 && (
+                              <>
+                                <div className="ar-fs-row">
+                                  <span>取り上げる山</span>
+                                </div>
+                                <div className="ar-caption-pick">
+                                  {arLabels.map((l, i) =>
+                                    l.description ? (
+                                      <button
+                                        key={i}
+                                        className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
+                                        onClick={() => setCaptionIdx(i)}
+                                      >
+                                        {l.name}
+                                      </button>
+                                    ) : null,
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        ),
+                      }
+                    : null,
+                  arLabels.some((l) => l.description) && bakeCaption
+                    ? {
+                        id: "descStyle",
+                        label: "解説表示",
+                        content: (
+                          <>
+                            {captionLang === "both" && (
+                              <div className="ar-fs-row">
+                                <span>並べ方</span>
+                                <div className="seg" role="group" aria-label="日英の並べ方">
+                                  {([["横", "horizontal"], ["縦", "vertical"]] as [string, "horizontal" | "vertical"][]).map(([lab, v]) => (
+                                    <button key={v} className={captionLayout === v ? "is-active" : ""} onClick={() => setCaptionLayout(v)}>
+                                      {lab}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {captionLang === "both" && (
+                              <div className="ar-fs-row">
+                                <span>見出し</span>
+                                <div className="ar-font-sel">
+                                  <select
+                                    value={captionTitleMode}
+                                    onChange={(e) => setCaptionTitleMode(e.target.value as "each" | "groupV" | "groupH" | "ja" | "en")}
+                                    aria-label="見出しの出し方"
+                                  >
+                                    <option value="each">本文ごと</option>
+                                    <option value="groupV">まとめる（上下）</option>
+                                    <option value="groupH">まとめる（左右）</option>
+                                    <option value="ja">日本語のみ</option>
+                                    <option value="en">英語のみ</option>
+                                  </select>
+                                </div>
+                              </div>
+                            )}
                             <div className="ar-fs-row">
                               <span>解説の色</span>
                               <div className="seg" role="group" aria-label="解説の色">
@@ -3695,11 +3710,9 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                             />
                             {fontRow("captionBody", "本文フォント")}
                           </>
-                        )}
-                            </>
-                          ),
-                        }
-                      : null,
+                        ),
+                      }
+                    : null,
                   {
                     id: "view",
                     label: (
