@@ -1,6 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="12" fill="#0b0e13"/>
-  <polygon points="8,50 26,22 44,50" fill="#5a6478"/>
-  <polygon points="20,50 40,12 60,50" fill="#ffd34d"/>
-  <polygon points="34,22 40,12 46,22 43,20 40,21 37,19" fill="#ffffff"/>
+  <polygon points="10,48 26,28 42,48" fill="#5a6478"/>
+  <polygon points="22,48 40,16 56,48" fill="#ffd34d"/>
+  <polygon points="34,26 40,16 46,26 43,24 40,25 37,23" fill="#ffffff"/>
+  <g fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
+    <path d="M18 7 H7 V18"/>
+    <path d="M46 7 H57 V18"/>
+    <path d="M18 57 H7 V46"/>
+    <path d="M46 57 H57 V46"/>
+  </g>
 </svg>

@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   camVex: 1.0, // カメラ視点モードの既定（実寸）
 };
 
-const STORAGE_KEY = "sangaku.settings.v1";
+const STORAGE_KEY = "trace.settings.v1";
 
 function load(): Settings {
   try {
