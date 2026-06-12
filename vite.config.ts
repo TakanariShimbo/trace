@@ -18,10 +18,10 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
       manifest: {
-        name: "Sangaku — 日本の山を見て知る",
-        short_name: "Sangaku",
+        name: "Trace — Find Your Frame",
+        short_name: "Trace",
         description:
-          "国土地理院の地形データで日本の山を見て知るアプリ。3D地形・太陽と月・写真/カメラのAR山名・オフライン保存。",
+          "山で写真を撮る人のためのアプリ。地形図・3D地形・太陽と月の軌道で撮影計画を立て、現地ではARで山の位置や地形を確認。撮影後は山名や軌跡を載せたビジュアルに仕上げ、撮影体験を残す。",
         lang: "ja",
         theme_color: "#0a0d12",
         background_color: "#0a0d12",

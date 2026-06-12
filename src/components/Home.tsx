@@ -9,8 +9,8 @@ export default function Home({ onSelect }: Props) {
     <div className="home">
       <div className="home-inner">
         <header className="home-head">
-          <h1>Sangaku</h1>
-          <p>日本の山を見て知る ― 3D地形・太陽と月・AR山名</p>
+          <h1>Trace</h1>
+          <p>Find Your Frame ― 山で写真を撮る人のための、撮影計画・AR・作品づくり</p>
         </header>
         <div className="home-cards">
           {CARDS.map((c) => (
