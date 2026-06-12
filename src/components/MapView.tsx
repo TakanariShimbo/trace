@@ -467,6 +467,11 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
   // 背景パネル（なし / 半透明 / 不透明）。ラベルと解説で別々。背景色は文字色の反対色。
   const [labelBg, setLabelBg] = useState<BgPanel>("none");
   const [captionBg, setCaptionBg] = useState<BgPanel>("none");
+  // フレーム（仕上げ）。切り抜き(crop)＋余白(margin)＋ふちグラデーション。出力枠基準・既定は無効。
+  const [cropInset, setCropInset] = useState({ l: 0, t: 0, r: 0, b: 0 }); // 写真の各辺を内側へ切り抜く割合
+  const [frameMargin, setFrameMargin] = useState({ t: 0, r: 0, b: 0, l: 0 }); // 余白（切り抜き後の辺長に対する割合）
+  const [frameMarginColor, setFrameMarginColor] = useState("#ffffff"); // 余白の色（白/黒）
+  const [frameFade, setFrameFade] = useState(0); // ふち：余白のある辺で写真を余白色へぼかす幅（切り抜き後の辺長に対する割合）
   // 解説ブロックの配置（写真フレーム内の正規化座標。ブロック左上）。ドラッグで移動。
   const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
   const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
@@ -1911,13 +1916,41 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     await img.decode();
     const W = img.naturalWidth;
     const H = img.naturalHeight;
-    const L = Math.max(W, H); // 文字サイズは写真の長辺基準（プレビューの cqmax と一致）
+    const L = Math.max(W, H); // 文字サイズは写真の長辺基準（切り抜き・余白に依らず一定）
+    // フレーム: 切り抜き(crop)→余白(margin)→ふち(fade)。出力枠 OW×OH を作る。既定では従来と同一。
+    const cl = cropInset.l * W, ct = cropInset.t * H;
+    const cw = Math.max(1, W * (1 - cropInset.l - cropInset.r));
+    const ch = Math.max(1, H * (1 - cropInset.t - cropInset.b));
+    const cwR = Math.round(cw), chR = Math.round(ch);
+    const mT = Math.round(frameMargin.t * chR), mB = Math.round(frameMargin.b * chR);
+    const mL = Math.round(frameMargin.l * cwR), mR = Math.round(frameMargin.r * cwR);
+    const OW = cwR + mL + mR, OH = chR + mT + mB; // 出力枠（ラベル位置の基準）
     const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
+    canvas.width = OW;
+    canvas.height = OH;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(img, 0, 0, W, H);
+    if (mT || mB || mL || mR) {
+      ctx.fillStyle = frameMarginColor;
+      ctx.fillRect(0, 0, OW, OH);
+    }
+    ctx.drawImage(img, cl, ct, cw, ch, mL, mT, cwR, chR);
+    // ふち: 余白のある辺で、写真を余白色へぼかす（写真側へ frameFade ぶん）。
+    if (frameFade > 0 && (mT || mB || mL || mR)) {
+      const fh = Math.round(frameFade * chR), fw = Math.round(frameFade * cwR);
+      const rgba = (a: number) => (frameMarginColor === "#000000" ? `rgba(0,0,0,${a})` : `rgba(255,255,255,${a})`);
+      const fade = (x0: number, y0: number, x1: number, y1: number, x: number, y: number, w: number, h: number) => {
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, rgba(1));
+        g.addColorStop(1, rgba(0));
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y, w, h);
+      };
+      if (mT && fh > 0) fade(0, mT, 0, mT + fh, mL, mT, cwR, fh); // 上
+      if (mB && fh > 0) fade(0, mT + chR, 0, mT + chR - fh, mL, mT + chR - fh, cwR, fh); // 下
+      if (mL && fw > 0) fade(mL, 0, mL + fw, 0, mL, mT, fw, chR); // 左
+      if (mR && fw > 0) fade(mL + cwR, 0, mL + cwR - fw, 0, mL + cwR - fw, mT, fw, chR); // 右
+    }
     const nameFs = Math.round(L * 0.026 * labelNameScale); // 山名（1段目）
     const subFs = Math.round(L * 0.026 * 0.62 * labelSubScale); // Mt.ローマ字｜標高（2段目）
     // 役割ごとのフォントファミリ（欧文先・和文後の合成スタック）。
@@ -1957,10 +1990,10 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
     ctx.textBaseline = "alphabetic";
     if (bakeLabels) {
       for (const lb of arLabels) {
-        const dotX = lb.dotU * W;
-        const dotY = lb.dotV * H;
-        const cx = lb.labelU * W; // ラベルの基準（下端中央）
-        const cy = lb.labelV * H;
+        const dotX = lb.dotU * OW;
+        const dotY = lb.dotV * OH;
+        const cx = lb.labelU * OW; // ラベルの基準（下端中央。出力枠基準）
+        const cy = lb.labelV * OH;
         const { name, sub } = labelContent(lb);
         const subBaseline = cy;
         // 補足があれば1段目はその上、無ければ1段目を下端（cy）に置く。
@@ -2029,8 +2062,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
         const bodyFs = Math.round(L * 0.02 * captionBodyScale); // 解説本文
         const titleLineH = Math.round(titleFs * 1.3);
         const lineH = Math.round(bodyFs * 1.5);
-        const blockW = Math.round(W * captionW);
-        const colGap = Math.round(W * 0.035);
+        const blockW = Math.round(OW * captionW);
+        const colGap = Math.round(OW * 0.035);
         const vertical = captionLayout === "vertical" && cols.length > 1; // 縦=上下に積む
         // 横並びは captionSplit（左=日本語の割合）で各カラム幅を決める。縦並びは全幅。
         const colWidths = vertical
@@ -2173,8 +2206,8 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
           sharedBelow +
           (vertical ? colBodyH.reduce((a, b) => a + b, 0) + rowGap * (cols.length - 1) : Math.max(...colBodyH));
         const blockH = bodyBlockH;
-        const bx = Math.min(Math.max(0, Math.round(captionPos.u * W)), Math.max(0, W - blockW));
-        const by = Math.min(Math.max(0, Math.round(captionPos.v * H)), Math.max(0, H - blockH));
+        const bx = Math.min(Math.max(0, Math.round(captionPos.u * OW)), Math.max(0, OW - blockW));
+        const by = Math.min(Math.max(0, Math.round(captionPos.v * OH)), Math.max(0, OH - blockH));
         // 背景パネル（本文ブロックの下に敷く）。
         if (captionBg !== "none") {
           const px = Math.round(L * 0.018), py = Math.round(L * 0.015);
@@ -3283,6 +3316,18 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
             }
           >
             {photoUrl && <img className="ar-edit-photo" src={photoUrl} alt="" draggable={false} />}
+            {/* 切り抜きプレビュー（残す範囲を枠で表示。外側を暗く）。出力では余白・ふちも反映。 */}
+            {(cropInset.l > 0 || cropInset.t > 0 || cropInset.r > 0 || cropInset.b > 0) && (
+              <div
+                className="ar-crop-rect"
+                style={{
+                  left: `${cropInset.l * 100}%`,
+                  top: `${cropInset.t * 100}%`,
+                  right: `${cropInset.r * 100}%`,
+                  bottom: `${cropInset.b * 100}%`,
+                }}
+              />
+            )}
             {/* 山名ラベル（表示ONのときだけ。引き出し線＋点＋名札） */}
             {bakeLabels && (
               <>
@@ -3779,6 +3824,71 @@ export default function MapView({ appMode, onHome, settings }: MapViewProps) {
                         ),
                       }
                     : null,
+                  {
+                    id: "frame",
+                    label: "フレーム",
+                    content: (
+                      <>
+                        <div className="ar-fs-row">
+                          <span>余白の色</span>
+                          <div className="seg" role="group" aria-label="余白の色">
+                            {([["白", "#ffffff"], ["黒", "#000000"]] as [string, string][]).map(([lab, v]) => (
+                              <button key={v} className={frameMarginColor === v ? "is-active" : ""} onClick={() => setFrameMarginColor(v)}>
+                                {lab}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {(["t", "b", "l", "r"] as const).map((d) => (
+                          <div key={`crop-${d}`}>
+                            <div className="ar-fs-slider-row">
+                              <span>{`切り抜き ${{ t: "上", b: "下", l: "左", r: "右" }[d]}`}</span>
+                              <span className="ar-fs-val">{Math.round(cropInset[d] * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              className="ar-fs-slider"
+                              min={0}
+                              max={0.45}
+                              step={0.01}
+                              value={cropInset[d]}
+                              onChange={(e) => setCropInset((p) => ({ ...p, [d]: Number(e.target.value) }))}
+                            />
+                          </div>
+                        ))}
+                        {(["t", "b", "l", "r"] as const).map((d) => (
+                          <div key={`margin-${d}`}>
+                            <div className="ar-fs-slider-row">
+                              <span>{`余白 ${{ t: "上", b: "下", l: "左", r: "右" }[d]}`}</span>
+                              <span className="ar-fs-val">{Math.round(frameMargin[d] * 100)}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              className="ar-fs-slider"
+                              min={0}
+                              max={0.6}
+                              step={0.01}
+                              value={frameMargin[d]}
+                              onChange={(e) => setFrameMargin((p) => ({ ...p, [d]: Number(e.target.value) }))}
+                            />
+                          </div>
+                        ))}
+                        <div className="ar-fs-slider-row">
+                          <span>ふち（グラデーション）</span>
+                          <span className="ar-fs-val">{Math.round(frameFade * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          className="ar-fs-slider"
+                          min={0}
+                          max={0.5}
+                          step={0.01}
+                          value={frameFade}
+                          onChange={(e) => setFrameFade(Number(e.target.value))}
+                        />
+                      </>
+                    ),
+                  },
                   {
                     id: "view",
                     label: (

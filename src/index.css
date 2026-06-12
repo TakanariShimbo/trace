@@ -1833,6 +1833,14 @@ body,
 .ar-caption:active {
   cursor: grabbing;
 }
+/* 切り抜きプレビュー枠（残す範囲。外側を暗く・破線アウトライン）。出力には焼き込まない。 */
+.ar-crop-rect {
+  position: absolute;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  outline: 1px dashed rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  z-index: 4;
+}
 /* 背景パネル（なし/半透明/不透明）。本文の下に敷く。 */
 .ar-caption.has-panel {
   isolation: isolate; /* ::before z-index:-1 を内部に閉じる */
