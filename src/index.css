@@ -1,6 +1,11 @@
 :root {
   color-scheme: dark;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* フォント設計（映像・編集ツールっぽい精密さ）。
+     display=見せる英字 / body=読ませる和欧 / mono=数値・タイムコード・キッカー。 */
+  --font-display: "Space Grotesk", "Noto Sans JP", "Inter", sans-serif;
+  --font-body: "Inter", "Noto Sans JP", sans-serif;
+  --font-mono: "IBM Plex Mono", "Roboto Mono", monospace;
+  font-family: var(--font-body);
   /* パネル内ボタンの共通高さ。すべての操作ボタンはこの高さに揃える（幅は中身次第）。 */
   --btn-h: 36px;
 }
@@ -2762,26 +2767,30 @@ body,
 }
 .home-title {
   margin: 0;
-  font-size: clamp(56px, 14vw, 108px);
-  font-weight: 700;
-  line-height: 0.92;
-  letter-spacing: -0.015em;
+  font-family: var(--font-display);
+  font-size: clamp(64px, 16vw, 132px);
+  font-weight: 600;
+  line-height: 0.85;
+  letter-spacing: -0.04em; /* Space Grotesk を詰めて“作品ロゴ”っぽく */
   color: #f5f2ea;
 }
+/* タグラインは Mono のキッカー（映像・解析ツールっぽい精密さ） */
 .home-tagline {
   margin: 0;
-  font-size: clamp(13px, 2.4vw, 17px);
+  font-family: var(--font-mono);
+  font-size: clamp(12px, 2.2vw, 15px);
   font-weight: 500;
-  letter-spacing: 0.46em;
+  letter-spacing: 0.34em;
   text-transform: uppercase;
   color: #d6b46a;
-  padding-left: 0.46em; /* レター スペーシングの右余りを相殺して中央に見せる */
+  padding-left: 0.34em; /* レタースペーシングの右余りを相殺して中央に見せる */
 }
 .home-lead {
   margin: 8px 0 0;
   max-width: 28em;
   font-size: 14px;
   line-height: 1.85;
+  letter-spacing: 0.01em;
   color: #9c9a94;
 }
 /* カード：半透明・細い枠・影なし・大きめ角丸（SaaSテンプレ感を抑える） */
@@ -2813,6 +2822,7 @@ body,
 .home--landing .home-card-title {
   font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.02em; /* モード名（和文）は整然と。やや字間を締める */
   color: #f5f2ea;
 }
 .home--landing .home-card-desc {
@@ -2820,4 +2830,15 @@ body,
   font-size: 12.5px;
   line-height: 1.65;
   color: #8f8d86;
+}
+
+/* 数値・座標・%・ステップ番号など「データ」系は Mono で映像・解析ツール感を出す。 */
+.zukan-card-elev,
+.zukan-fact b,
+.zukan-fact--dim,
+.ar-fs-val,
+.slider-label b,
+.stage-zoom-val,
+.peak-clear b {
+  font-family: var(--font-mono);
 }
