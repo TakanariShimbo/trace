@@ -253,7 +253,7 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
         /* ====== 一覧ページ ====== */
         <div className="zukan-inner">
           <header className="home-head">
-            <h1>山の図鑑</h1>
+            <h1>山を知る</h1>
             <p>日本の山 {entries ? entries.length.toLocaleString() : "…"} 座 ― 検索・絞り込みで、つぎに撮りたい山を見つける</p>
           </header>
 

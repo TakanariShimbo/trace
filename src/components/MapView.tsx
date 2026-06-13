@@ -64,6 +64,7 @@ import {
   type PrefetchProgress,
 } from "../lib/prefetch";
 import type { Settings } from "../settings";
+import { CARDS } from "../modeCards";
 
 // 3Dビュー本体。Three.js のセットアップ、地図的なカメラ操作（MapControls＋画面ボタン）、
 // 毎フレームのクアッドツリー更新、そして事前ロード（中心＋半径でオフライン保存）UI を持つ。
@@ -3147,17 +3148,11 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     </label>
   );
   // モードのパネルタイトル（ホームのカード名と揃える）。地図ドック・カメラHUDで共用。
-  const modeTitle = showCelestial ? (
+  // タイトル文言はホームのカード定義（CARDS）を単一ソースにして、ホームと在モードで必ず一致させる。
+  const modeCardTitle = CARDS.find((c) => c.mode === appMode)?.title ?? "";
+  const modeTitle = (
     <>
-      <IconSun size={15} /> 太陽・月の動きを見る
-    </>
-  ) : isOffline ? (
-    <>
-      <IconDownload size={15} /> オフライン保存
-    </>
-  ) : (
-    <>
-      <IconMountain size={15} /> 地形を見る
+      {showCelestial ? <IconSun size={15} /> : isOffline ? <IconDownload size={15} /> : <IconMountain size={15} />} {modeCardTitle}
     </>
   );
   // モードのアナウンス（タイトル直下に出す短い案内）。

@@ -22,7 +22,7 @@ export default function SettingsScreen({ settings, onChangeSettings, onHome }: P
 
       <div className="home-inner">
         <header className="home-head">
-          <h1>表示設定</h1>
+          <h1>表示を整える</h1>
           <p>各モードに引き継がれます</p>
         </header>
 
