@@ -2600,12 +2600,12 @@ body,
   gap: 6px;
   margin-top: 2px; /* チップ → タグ = 20 */
 }
-/* シミュレーションへの導線（地形のみ / 太陽・月あり）。タグの下・本文の上。 */
+/* シミュレーションへの導線（地形のみ / 太陽・月あり）。読み終わりの次アクションとして解説の下。 */
 .zukan-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 6px; /* タグ → アクション = 24 */
+  margin-top: 10px; /* 英語本文 → アクション = 28 */
 }
 .zukan-action {
   display: inline-flex;
@@ -2626,7 +2626,7 @@ body,
 }
 /* 本文。「データ（チップ・タグ）」と「読み物（本文）」の間はしっかり空ける。 */
 .zukan-desc {
-  margin: 14px 0 0; /* アクション → 日本語本文 = 32 */
+  margin: 14px 0 0; /* タグ → 日本語本文 = 32 */
   font-size: 16px;
   line-height: 2;
   color: rgba(235, 241, 248, 0.92);

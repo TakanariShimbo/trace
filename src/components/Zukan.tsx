@@ -160,7 +160,9 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               ))}
             </div>
           )}
-          {/* この山を中心にシミュレーションへ（地形のみ / 太陽・月あり） */}
+          {selected.descriptionJa && <p className="zukan-desc">{selected.descriptionJa}</p>}
+          {selected.descriptionEn && <p className="zukan-desc zukan-desc--en">{selected.descriptionEn}</p>}
+          {/* この山を中心にシミュレーションへ（地形のみ / 太陽・月あり）。読み終わりの導線として解説の下。 */}
           <div className="zukan-actions">
             <button
               className="zukan-action"
@@ -175,8 +177,6 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               <IconSun size={15} /> 太陽・月の動きと見る
             </button>
           </div>
-          {selected.descriptionJa && <p className="zukan-desc">{selected.descriptionJa}</p>}
-          {selected.descriptionEn && <p className="zukan-desc zukan-desc--en">{selected.descriptionEn}</p>}
           {selected.url && (
             <p className="zukan-src">
               出典・参考:{" "}
