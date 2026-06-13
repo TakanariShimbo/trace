@@ -2653,9 +2653,9 @@ body,
 }
 /* 詳細の縦リズム（.zukan-inner の gap:18px に margin を足して、
    画像↓32 → 山名↓12 → ふりがな↓28 → チップ↓20 → タグ↓32 → 日本語↓24 → 英語 にする）。 */
-/* 画像と山名はセットで見せたいので詰める（flex gap 18 を負マージンで相殺）。 */
+/* 画像と山名はセットで見せたい。詰めすぎず適度に（flex gap 18 + 10 ≈ 28px）。 */
 .zukan-detail-head {
-  margin-top: -4px; /* 画像 → 山名 ≈ 14 */
+  margin-top: 10px; /* 画像 → 山名 ≈ 28 */
 }
 .zukan-detail-head h1 {
   margin: 0;
