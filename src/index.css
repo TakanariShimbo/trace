@@ -2515,12 +2515,15 @@ body,
 .zukan-back:hover {
   background: rgba(54, 68, 86, 0.75);
 }
-/* 写真の代わりの3D周回ビュー（ヒーロー） */
+/* 写真の代わりの3D周回ビュー（ヒーロー）。
+   アスペクト比は常に16:9固定。.zukan-inner は画面高さにストレッチされた flex 列なので、
+   flex:none を付けないと中身が増えた時にこのボックスだけ縮められてしまう。
+   縦に収まらない分はページ（.home の overflow:auto）がスクロールを受け持つ。 */
 .zukan-orbit {
   position: relative;
+  flex: none;
   width: 100%;
   aspect-ratio: 16 / 9;
-  max-height: 52vh;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(130, 150, 175, 0.3);
