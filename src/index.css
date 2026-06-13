@@ -2349,11 +2349,7 @@ body,
 .zukan-inner::after {
   content: "";
   flex: none;
-  height: calc(72px + env(safe-area-inset-bottom, 0px));
-}
-/* 個別詳細は読み物が長く、末尾（ボタン・出典）が下端に詰まりやすいのでさらに広く。 */
-.zukan-inner--detail::after {
-  height: calc(140px + env(safe-area-inset-bottom, 0px));
+  height: calc(70px + env(safe-area-inset-bottom, 0px));
 }
 /* 検索＋フィルタ＋ソートの操作列 */
 .zukan-controls {
