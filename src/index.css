@@ -2549,13 +2549,13 @@ body,
   flex-wrap: wrap;
   gap: 5px;
 }
-/* タグ（ピル）。詳細はクリックで一覧の絞り込みに使える。 */
+/* タグ（ピル）。詳細はクリックで一覧の絞り込みに使える。他のピルと枠・地・角丸を統一。 */
 .zukan-tag {
-  padding: 3px 10px;
-  font-size: 12px;
+  padding: 5px 12px;
+  font-size: 12.5px;
   color: rgba(255, 255, 255, 0.72);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   cursor: pointer;
 }
@@ -2593,15 +2593,16 @@ body,
   font-size: 13px;
 }
 /* ---- 詳細ページ ---- */
+/* ピル共通の見た目（戻る・基本情報・タグ・CTA で統一）。半透明・細枠・全角丸・13px。 */
 .zukan-back {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 7px 14px 7px 10px;
+  gap: 6px;
+  padding: 7px 15px 7px 11px;
   color: var(--sub);
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   font-size: 13px;
   cursor: pointer;
@@ -2691,13 +2692,13 @@ body,
 .zukan-fact {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   padding: 7px 15px;
   font-size: 13px;
   color: var(--fg);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 20px;
+  border-radius: 999px;
 }
 .zukan-fact svg {
   color: rgba(255, 255, 255, 0.5);
@@ -2736,11 +2737,11 @@ body,
 .zukan-action {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 16px;
+  gap: 6px;
+  padding: 7px 15px;
   font-size: 13px;
   color: #ece6d8;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   cursor: pointer;

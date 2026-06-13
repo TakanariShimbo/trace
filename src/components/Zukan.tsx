@@ -257,13 +257,13 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               className="zukan-action"
               onClick={() => onOpenMap("terrain", { lat: selected.lat, lon: selected.lon })}
             >
-              <IconMountain size={15} /> 地形を読む
+              <IconMountain size={13} /> 地形を読む
             </button>
             <button
               className="zukan-action"
               onClick={() => onOpenMap("celestial", { lat: selected.lat, lon: selected.lon })}
             >
-              <IconSun size={15} /> 光を読む
+              <IconSun size={13} /> 光を読む
             </button>
           </div>
           {selected.url && (
