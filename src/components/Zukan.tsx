@@ -1,7 +1,7 @@
 // 山の図鑑。全1,061座を検索・フィルタ・ソートで一覧し、個別ページでは
 // 写真の代わりに3D地形の自動周回ビュー＋解説で山を知る。
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IconHome, IconChevron, IconSearch, IconMountain, IconSun, IconLink } from "./icons";
+import { IconHome, IconChevron, IconSearch, IconMountain, IconSun, IconLink, IconPin, IconLocate } from "./icons";
 import { loadZukanEntries, type ZukanEntry } from "../lib/mountains";
 import ZukanOrbit from "./ZukanOrbit";
 
@@ -188,8 +188,7 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
           <button className="zukan-back" onClick={backToList}>
             <IconChevron dir="left" size={16} /> 図鑑にもどる
           </button>
-          {/* 写真の代わり: 3D地形の自動周回ビュー */}
-          <ZukanOrbit lat={selected.lat} lon={selected.lon} elevationM={selected.elevationM} />
+          {/* 図鑑の作法：まず山名（主役）→読み/英名→基本情報、その後に写真（主役の1枚）。 */}
           <header className="zukan-detail-head">
             <h1>{selected.name}</h1>
             {/* 読み・英名は「同じ役割の補足情報1行」。英名は補足なのでさらにトーンを落とす。 */}
@@ -199,14 +198,23 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               {selected.titleEn && <span className="zukan-sub-en">{selected.titleEn}</span>}
             </p>
           </header>
-          {/* 標高（最強）→所在地、座標は次行に逃がして弱い注記に。 */}
+          {/* 基本情報ラベル：標高（最強）→所在地。展示ラベル風にアイコン付き。 */}
           <div className="zukan-detail-facts">
             <span className="zukan-fact">
+              <IconMountain size={13} />
               <b>{selected.elevationM.toLocaleString()}</b> m
             </span>
-            {selected.prefecture && <span className="zukan-fact">{selected.prefecture.replace(/\//g, "・")}</span>}
+            {selected.prefecture && (
+              <span className="zukan-fact">
+                <IconPin size={13} />
+                {selected.prefecture.replace(/\//g, "・")}
+              </span>
+            )}
           </div>
+          {/* 写真（の代わりの3D周回ビュー）を主役の1枚として置く */}
+          <ZukanOrbit lat={selected.lat} lon={selected.lon} elevationM={selected.elevationM} />
           <p className="zukan-coords">
+            <IconLocate size={13} />
             {selected.lat.toFixed(4)}, {selected.lon.toFixed(4)}
           </p>
           {selected.tags.length > 0 && (

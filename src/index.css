@@ -5,6 +5,7 @@
   --font-display: "Space Grotesk", "Noto Sans JP", "Inter", sans-serif;
   --font-body: "Inter", "Noto Sans JP", sans-serif;
   --font-mono: "IBM Plex Mono", "Roboto Mono", monospace;
+  --font-serif: "Noto Serif JP", serif; /* 図鑑の山名など“作品”の見出し用 */
   font-family: var(--font-body);
   /* パネル内ボタンの共通高さ。すべての操作ボタンはこの高さに揃える（幅は中身次第）。 */
   --btn-h: 36px;
@@ -2614,15 +2615,18 @@ body,
    アスペクト比は常に16:9固定。.zukan-inner は画面高さにストレッチされた flex 列なので、
    flex:none を付けないと中身が増えた時にこのボックスだけ縮められてしまう。
    縦に収まらない分はページ（.home の overflow:auto）がスクロールを受け持つ。 */
+/* 写真（の代わりの3D周回ビュー）は“主役の1枚”。少し堂々と、作品カードとして置く。 */
 .zukan-orbit {
   position: relative;
   flex: none;
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 16px;
+  margin-top: 6px; /* チップ → 写真 ≈ 24 */
+  border-radius: 22px;
   overflow: hidden;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: #0a0a0b;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
 }
 .zukan-orbit-canvas {
   position: absolute;
@@ -2659,10 +2663,11 @@ body,
 }
 .zukan-detail-head h1 {
   margin: 0;
-  font-size: clamp(30px, 6vw, 48px);
-  font-weight: 700;
-  line-height: 1.05; /* 行間のリードを詰めて画像との一体感を出す */
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif); /* 山名だけ明朝で“作品”として特別扱い */
+  font-size: clamp(36px, 8vw, 56px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
   color: var(--fg);
 }
 /* 読み・英名は同じ役割の“補足情報1行”。英名は補足なのでさらにトーンを落とす。 */
@@ -2682,33 +2687,46 @@ body,
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 16px; /* 補足行 → チップ */
+  margin-top: 0; /* 読み → チップ = gap18 */
 }
+/* 展示ラベル風：薄い半透明・細枠・しっかり角丸・アイコン付き（“ボタン”に見せない）。 */
 .zukan-fact {
-  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 15px;
   font-size: 13px;
   color: var(--fg);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+}
+.zukan-fact svg {
+  color: rgba(255, 255, 255, 0.5);
 }
 .zukan-fact b {
   color: var(--fg);
   font-variant-numeric: tabular-nums;
 }
-/* 座標は主情報ではないので、チップ行の下に小さく・薄く・Mono で添える。 */
+/* 座標は補助情報。写真の直下に、小さく薄く Mono ＋アイコンで控えめに。 */
 .zukan-coords {
-  margin: 8px 0 0; /* チップ → 座標 */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 0; /* 写真 → 座標 ≈ 14 */
   font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.36);
+  color: rgba(255, 255, 255, 0.4);
+}
+.zukan-coords svg {
+  opacity: 0.7;
 }
 .zukan-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 2px; /* チップ → タグ = 20 */
+  margin-top: -4px; /* 座標 → タグ ≈ 14 */
 }
 /* シミュレーションへの導線（地形のみ / 太陽・月あり）。読み物のトーンを壊さないよう静かに。 */
 .zukan-actions {
@@ -2737,7 +2755,8 @@ body,
 }
 /* 解説のかたまり（日本語→EN→英語）。flex gap に左右されず、内部の余白を精密に制御する。 */
 .zukan-desc-block {
-  margin-top: 14px; /* タグ → 本文（gap18と合わせて約32） */
+  margin-top: 6px; /* タグ → 本文（gap18と合わせて約24） */
+  max-width: 42em; /* 1行を少し抑えて読みやすく・上品に */
 }
 /* 本文は山名より一段控えめに（主従をつける）。 */
 .zukan-desc {
@@ -2747,14 +2766,22 @@ body,
   letter-spacing: 0.02em;
   color: rgba(245, 242, 234, 0.9);
 }
-/* 言語ラベル（JA / EN）。日英あるとき対で出し、Mono の小さな“章見出し”に。 */
+/* 言語ラベル（JA / EN）。落ち着いた金で、下に短い線を引いて“解説節”に。 */
 .zukan-section-label {
-  margin: 28px 0 8px; /* 前の本文 → ラベル / ラベル → 本文 */
+  margin: 30px 0 12px; /* 前の本文 → ラベル / ラベル → 本文 */
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.16em;
-  color: rgba(214, 180, 106, 0.6);
+  letter-spacing: 0.18em;
+  color: #b79a62;
+}
+.zukan-section-label::after {
+  content: "";
+  display: block;
+  width: 28px;
+  height: 1px;
+  margin-top: 7px;
+  background: rgba(183, 154, 98, 0.5);
 }
 .zukan-section-label:first-child {
   margin-top: 0; /* ブロック先頭(JA)はブロック側マージンに任せる */
