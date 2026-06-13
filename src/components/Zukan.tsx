@@ -326,8 +326,11 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
                   </option>
                 ))}
               </select>
-              <span className="zukan-count">{entries ? `${filtered.length.toLocaleString()} 座` : "…"}</span>
             </div>
+            {/* 件数は既定では出さず（総数はタイトルにある）、絞り込んだ時だけ控えめに表示。 */}
+            {entries && filtered.length !== entries.length && (
+              <p className="zukan-count">{filtered.length.toLocaleString()} 座を表示</p>
+            )}
           </div>
 
           {/* カード一覧（段階表示） */}
@@ -346,7 +349,7 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
                   </span>
                 )}
                 {e.prefecture && <span className="zukan-card-pref">{e.prefecture.replace(/\//g, "・")}</span>}
-                {e.descriptionShortJa && <span className="zukan-card-desc">{e.descriptionShortJa}</span>}
+                {/* 一覧は「読まずに選ぶ」。説明文は出さず、タグで特徴を伝える。 */}
                 {e.tags.length > 0 && (
                   <span className="zukan-card-tags">
                     {e.tags.slice(0, 3).map((t) => (
@@ -354,7 +357,9 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
                         {t}
                       </span>
                     ))}
-                    {e.tags.length > 3 && <span className="zukan-card-more">+{e.tags.length - 3}</span>}
+                    {e.tags.length > 3 && (
+                      <span className="zukan-tag zukan-tag--mini zukan-tag--more">+{e.tags.length - 3}</span>
+                    )}
                   </span>
                 )}
               </button>

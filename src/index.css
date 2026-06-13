@@ -2421,16 +2421,15 @@ body,
   font-size: 15px;
   outline: none;
 }
-/* 絞り込みは小さなピル。件数は同じ行の右端へ。 */
+/* 絞り込みは 2×2 で安定させる（有名順だけ落ちる不安定さを解消）。 */
 .zukan-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 .zukan-filters select {
-  height: 34px;
-  padding: 0 12px;
+  height: 36px;
+  padding: 0 14px;
   color: var(--fg);
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -2439,9 +2438,10 @@ body,
   cursor: pointer;
 }
 .zukan-count {
-  margin: 0 0 0 auto; /* 行末へ押し出す */
+  margin: 2px 0 0; /* 絞り込み下に右寄せで控えめに */
   font-size: 12px;
   color: var(--sub);
+  text-align: right;
 }
 /* 共有リンクのコピー（右上・ホームボタンの左隣）。図鑑・地形・太陽月で共用。 */
 .share-btn {
@@ -2478,23 +2478,23 @@ body,
     font-size: 0;
   }
 }
-/* カード一覧 */
+/* カード一覧。検索エリアとの間に余白を取り、カード間も少し広めに。 */
 .zukan-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
+  margin-top: 12px; /* 検索/絞り込み → 一覧 ≈ 30 */
 }
 @media (max-width: 640px) {
   .zukan-grid {
     grid-template-columns: 1fr;
   }
 }
-/* カードは“図鑑の目次”。枠は控えめ・内側に呼吸・情報の主従をつける。 */
+/* カードは“図鑑の目次”。説明文は持たず、山名・場所・タグで選ばせる。 */
 .zukan-card {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 18px 20px;
+  padding: 20px 22px;
   text-align: left;
   color: var(--fg);
   background: rgba(255, 255, 255, 0.035);
@@ -2515,48 +2515,42 @@ body,
   gap: 10px;
 }
 .zukan-card-name {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .zukan-card-elev {
   flex: none;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  color: rgba(242, 240, 234, 0.78);
   font-variant-numeric: tabular-nums;
 }
 /* 読み / 英名（詳細ページと同じ並び）。 */
 .zukan-card-reading {
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.56);
+  margin-top: 12px;
+  font-size: 14px;
+  color: rgba(242, 240, 234, 0.56);
 }
 .zukan-card-en {
   opacity: 0.82;
 }
 .zukan-card-pref {
-  font-size: 12px;
-  color: var(--sub);
-}
-.zukan-card-desc {
-  margin-top: 3px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.5);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin-top: 7px;
+  font-size: 14px;
+  color: rgba(242, 240, 234, 0.66);
 }
 .zukan-card-tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
-  margin-top: 4px;
+  gap: 6px;
+  margin-top: 18px;
 }
-.zukan-card-more {
-  font-size: 11px;
-  color: var(--sub);
+/* 「+N」はタグと同じ形のチップ（他タグより一段弱い）。 */
+.zukan-tag--more {
+  color: rgba(242, 240, 234, 0.55);
+  border-color: rgba(242, 240, 234, 0.18);
+  cursor: default;
 }
 /* タグ（ピル）。詳細はクリックで一覧の絞り込みに使える。他のピルと枠・地・角丸を統一。 */
 .zukan-tag {
