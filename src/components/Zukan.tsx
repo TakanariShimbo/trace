@@ -192,10 +192,8 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
           <ZukanOrbit lat={selected.lat} lon={selected.lon} elevationM={selected.elevationM} />
           <header className="zukan-detail-head">
             <h1>{selected.name}</h1>
-            <p className="zukan-detail-sub">
-              {selected.kana && <span>{selected.kana}</span>}
-              {selected.titleEn && <span>{selected.titleEn}</span>}
-            </p>
+            {/* 読み・英名は「同じ役割の補足情報」として1行に。/ で1まとまりに見せる。 */}
+            <p className="zukan-detail-sub">{[selected.kana, selected.titleEn].filter(Boolean).join("  /  ")}</p>
           </header>
           <div className="zukan-detail-facts">
             <span className="zukan-fact">
@@ -223,12 +221,16 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               ))}
             </div>
           )}
-          {selected.descriptionJa && <p className="zukan-desc">{selected.descriptionJa}</p>}
-          {selected.descriptionEn && (
-            <>
-              <p className="zukan-section-label">EN</p>
-              <p className="zukan-desc zukan-desc--en">{selected.descriptionEn}</p>
-            </>
+          {(selected.descriptionJa || selected.descriptionEn) && (
+            <div className="zukan-desc-block">
+              {selected.descriptionJa && <p className="zukan-desc">{selected.descriptionJa}</p>}
+              {selected.descriptionEn && (
+                <>
+                  <p className="zukan-section-label">EN</p>
+                  <p className="zukan-desc zukan-desc--en">{selected.descriptionEn}</p>
+                </>
+              )}
+            </div>
           )}
           {/* この山を中心にシミュレーションへ（地形のみ / 太陽・月あり）。読み終わりの導線として解説の下。 */}
           <div className="zukan-actions">
@@ -236,13 +238,13 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               className="zukan-action"
               onClick={() => onOpenMap("terrain", { lat: selected.lat, lon: selected.lon })}
             >
-              <IconMountain size={15} /> この山の地形を読む
+              <IconMountain size={15} /> 地形を読む
             </button>
             <button
               className="zukan-action"
               onClick={() => onOpenMap("celestial", { lat: selected.lat, lon: selected.lon })}
             >
-              <IconSun size={15} /> この山で太陽と月を追う
+              <IconSun size={15} /> 光を読む
             </button>
           </div>
           {selected.url && (
