@@ -170,6 +170,14 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
 
   return (
     <div className="home zukan" ref={rootRef}>
+      {/* 共有リンクのコピー（右上・ホームの左隣。詳細＝この山 / 一覧＝検索結果へのリンク）。 */}
+      <button
+        className="zukan-share"
+        title={selected ? "この山へのリンクをコピー" : "この検索結果へのリンクをコピー"}
+        onClick={copyLink}
+      >
+        <IconLink size={15} /> {copied ? "コピーしました ✓" : "リンクをコピー"}
+      </button>
       <button className="home-btn" title="ホーム画面へ戻る" aria-label="ホーム" onClick={onHome}>
         <IconHome size={18} />
       </button>
@@ -230,9 +238,6 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
               onClick={() => onOpenMap("celestial", { lat: selected.lat, lon: selected.lon })}
             >
               <IconSun size={15} /> 太陽・月の動きと見る
-            </button>
-            <button className="zukan-action zukan-action--ghost" onClick={copyLink}>
-              <IconLink size={15} /> {copied ? "コピーしました ✓" : "リンクをコピー"}
             </button>
           </div>
           {selected.url && (
@@ -296,12 +301,7 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
                 ))}
               </select>
             </div>
-            <div className="zukan-count-row">
-              <button className="zukan-copy" onClick={copyLink} title="この検索結果へのリンクをコピー">
-                <IconLink size={13} /> {copied ? "コピーしました ✓" : "検索結果のリンクをコピー"}
-              </button>
-              <p className="zukan-count">{entries ? `${filtered.length.toLocaleString()} 座` : "読み込み中…"}</p>
-            </div>
+            <p className="zukan-count">{entries ? `${filtered.length.toLocaleString()} 座` : "読み込み中…"}</p>
           </div>
 
           {/* カード一覧（段階表示） */}

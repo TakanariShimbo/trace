@@ -2388,34 +2388,46 @@ body,
   border-radius: 9px;
   font-size: 13px;
 }
-.zukan-count-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
 .zukan-count {
   margin: 0;
   font-size: 12px;
   color: #9fb0c4;
   text-align: right;
 }
-/* 検索結果の共有リンクコピー（控えめなテキストボタン） */
-.zukan-copy {
+/* 共有リンクのコピー（右上・ホームボタンの左隣に常設）。 */
+.zukan-share {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top, 8px));
+  right: calc(max(8px, env(safe-area-inset-right, 8px)) + 50px); /* 42px(home) + 8px */
+  z-index: 23;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  font-size: 12px;
-  color: #9fb0c4;
-  background: transparent;
-  border: 1px solid rgba(130, 150, 175, 0.25);
-  border-radius: 999px;
+  gap: 7px;
+  height: 42px;
+  padding: 0 15px;
+  font-size: 13px;
+  color: #dceafc;
+  background: rgba(18, 24, 33, 0.78);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
   cursor: pointer;
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.zukan-copy:hover {
-  color: #cdd6e2;
-  border-color: rgba(143, 194, 255, 0.45);
+.zukan-share:hover {
+  border-color: rgba(143, 194, 255, 0.55);
+  background: rgba(26, 35, 49, 0.85);
+}
+@media (max-width: 480px) {
+  /* 狭い画面では文字を隠してアイコンだけに（はみ出し防止）。 */
+  .zukan-share {
+    padding: 0;
+    width: 42px;
+    justify-content: center;
+    gap: 0;
+    font-size: 0;
+  }
 }
 /* カード一覧 */
 .zukan-grid {
@@ -2647,16 +2659,6 @@ body,
 .zukan-action:hover {
   background: rgba(63, 111, 176, 0.42);
   border-color: rgba(143, 194, 255, 0.65);
-}
-/* 控えめなアクション（リンクコピーなど）。青塗りなしの枠だけ。 */
-.zukan-action--ghost {
-  color: #b9c6d8;
-  background: transparent;
-  border-color: rgba(130, 150, 175, 0.32);
-}
-.zukan-action--ghost:hover {
-  background: rgba(40, 52, 68, 0.5);
-  border-color: rgba(143, 194, 255, 0.5);
 }
 /* 本文。「データ（チップ・タグ）」と「読み物（本文）」の間はしっかり空ける。 */
 .zukan-desc {
