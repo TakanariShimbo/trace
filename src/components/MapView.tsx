@@ -65,6 +65,12 @@ import {
 } from "../lib/prefetch";
 import type { Settings } from "../settings";
 import { CARDS } from "../modeCards";
+import {
+  renderTerrainStamp,
+  formatLatLonShort,
+  type StampStyle,
+  type StampOrientation,
+} from "../lib/terrainStamp";
 
 // 3Dビュー本体。Three.js のセットアップ、地図的なカメラ操作（MapControls＋画面ボタン）、
 // 毎フレームのクアッドツリー更新、そして事前ロード（中心＋半径でオフライン保存）UI を持つ。
@@ -516,6 +522,20 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [frameMargin, setFrameMargin] = useState({ t: 0, r: 0, b: 0, l: 0 }); // 余白（切り抜き後の辺長に対する割合）
   const [frameMarginColor, setFrameMarginColor] = useState("#ffffff"); // 余白の色（白/黒）
   const [frameFade, setFrameFade] = useState(0); // ふち：余白のある辺で写真を余白色へぼかす幅（切り抜き後の辺長に対する割合）
+  // 3Dミニマップ・スタンプ（写真ARの仕上げで写真の隅に焼き込む）。既定はオフ。
+  const [stampOn, setStampOn] = useState(false);
+  const [stampStyle, setStampStyle] = useState<StampStyle>("contour");
+  const [stampCorner, setStampCorner] = useState<"br" | "bl" | "tr" | "tl">("br");
+  const [stampRangeKm, setStampRangeKm] = useState(5);
+  const [stampAccent, setStampAccent] = useState("#d8ff4a");
+  const [stampShowInfo, setStampShowInfo] = useState(true);
+  const [stampOrient, setStampOrient] = useState<StampOrientation>("heading");
+  // プレビュー用のスタンプ画像（PNG dataURL）と山情報。書き出しは bakeComposite で都度再生成。
+  const [stampPreview, setStampPreview] = useState<{
+    url: string;
+    mountain: { id?: number; name: string; lat: number; lon: number; elevationM: number } | null;
+    oriented: boolean;
+  } | null>(null);
   // 解説ブロックの配置（写真フレーム内の正規化座標。ブロック左上）。ドラッグで移動。
   const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
   const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
@@ -1649,6 +1669,56 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     }
   }, [arLike, arStep, arLoc, arHeadingDeg, arFovDeg]);
 
+  // スタンプ対象の山ID（arLabels の中身の変動＝ラベルドラッグで参照が変わっても、id
+  // 自体が変わらないかぎり再生成は不要）。
+  const stampMountainId = arLabels[captionIdx]?.id;
+  // 3Dミニマップ・スタンプのプレビュー生成。仕上げ画面でオン時のみ。
+  // 設定変更を 220ms デバウンスして再生成（DEM タイルは Cache 経由なので2回目以降は高速）。
+  useEffect(() => {
+    if (!stampOn || arStep !== "export" || !arLoc) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStampPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      try {
+        const r = await renderTerrainStamp({
+          center: { lat: arLoc.lat, lon: arLoc.lon },
+          mountainId: stampMountainId,
+          rangeKm: stampRangeKm,
+          style: stampStyle,
+          accent: stampAccent,
+          headingDeg: arHeadingDeg,
+          orientationMode: stampOrient,
+          size: 384,
+        });
+        if (cancelled) return;
+        setStampPreview({
+          url: r.canvas.toDataURL("image/png"),
+          mountain: r.mountain,
+          oriented: r.oriented,
+        });
+      } catch {
+        if (!cancelled) setStampPreview(null);
+      }
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [
+    stampOn,
+    arStep,
+    arLoc,
+    arHeadingDeg,
+    stampMountainId,
+    stampRangeKm,
+    stampStyle,
+    stampAccent,
+    stampOrient,
+  ]);
+
   // 初回起動: 現在地が取れればそこへ移動し、ホームの基準にする。取れなければ日本全体ビューのまま。
   // ライブARは別途 startLiveLocate で現在地→撮影地点に置くのでここはスキップ。
   useEffect(() => {
@@ -2420,6 +2490,113 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
           wrapped.forEach((_w, ci) => {
             drawCol(ci, bx + (ci === 0 ? 0 : colWidths[0] + colGap), top);
           });
+        }
+        ctx.restore();
+      }
+    }
+    // === 3Dミニマップ・スタンプの焼き込み。stampOn のときだけ、ラベル/解説の上に乗せる。 ===
+    if (stampOn && arLoc) {
+      const SHORT = Math.min(OW, OH);
+      const stampPx = Math.round(SHORT * 0.30); // 短辺の30%
+      const margin = Math.round(SHORT * 0.04);
+      // 高解像度で再生成（プレビューより大きく）。DEMはCache越しなので2回目は速い。
+      let result: Awaited<ReturnType<typeof renderTerrainStamp>> | null;
+      try {
+        result = await renderTerrainStamp({
+          center: { lat: arLoc.lat, lon: arLoc.lon },
+          mountainId: arLabels[captionIdx]?.id,
+          rangeKm: stampRangeKm,
+          style: stampStyle,
+          accent: stampAccent,
+          headingDeg: arHeadingDeg,
+          orientationMode: stampOrient,
+          size: Math.max(384, Math.min(1024, stampPx * 2)),
+        });
+      } catch {
+        result = null;
+      }
+      if (result) {
+        // 背景カード（半透明・細白枠・角丸・影）。マージンの内側にカードがすっぽり収まるように配置。
+        const cardPad = Math.round(SHORT * 0.012);
+        const cardR = Math.round(SHORT * 0.012);
+        const infoH = stampShowInfo && result.mountain ? Math.round(SHORT * 0.07) : 0;
+        const cardW = stampPx + cardPad * 2;
+        const cardH = stampPx + cardPad * 2 + infoH;
+        const cardX =
+          stampCorner === "br" || stampCorner === "tr" ? OW - margin - cardW : margin;
+        const cardY =
+          stampCorner === "br" || stampCorner === "bl" ? OH - margin - cardH : margin;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.32)";
+        ctx.shadowBlur = Math.round(SHORT * 0.018);
+        ctx.shadowOffsetY = Math.round(SHORT * 0.006);
+        ctx.fillStyle = "rgba(8,12,17,0.66)";
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardW, cardH, cardR);
+        ctx.fill();
+        ctx.shadowColor = "transparent";
+        ctx.lineWidth = Math.max(1, Math.round(SHORT * 0.0014));
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.stroke();
+        ctx.restore();
+        // スタンプ画像。
+        const sx = cardX + cardPad;
+        const sy = cardY + cardPad;
+        ctx.drawImage(result.canvas, sx, sy, stampPx, stampPx);
+        // 情報ブロック。山が見つかれば 名/標高/座標、見つからなければ「撮影地点」+ 座標。
+        if (stampShowInfo) {
+          const ffName = roleFontStack(roleFonts.captionTitle);
+          const ffMono = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+          await Promise.all([
+            document.fonts.load(`700 16px "${FONT_PAIRS[roleFonts.captionTitle].jp}"`).catch(() => {}),
+            document.fonts.load(`400 16px "${FONT_PAIRS[roleFonts.captionBody].jp}"`).catch(() => {}),
+          ]);
+          const infoX = sx;
+          let infoY = sy + stampPx + Math.round(infoH * 0.18);
+          const nameFs = Math.round(SHORT * 0.022);
+          const elevFs = Math.round(SHORT * 0.018);
+          const coordFs = Math.round(SHORT * 0.014);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+          if (result.mountain) {
+            ctx.fillStyle = "#f5f3ec";
+            ctx.font = `700 ${nameFs}px ${ffName}`;
+            ctx.fillText(result.mountain.name, infoX, infoY + nameFs);
+            infoY += nameFs + Math.round(nameFs * 0.18);
+            ctx.fillStyle = stampAccent;
+            ctx.font = `500 ${elevFs}px ${ffMono}`;
+            ctx.fillText(`${Math.round(result.mountain.elevationM)} m`, infoX, infoY + elevFs);
+            infoY += elevFs + Math.round(elevFs * 0.18);
+            ctx.fillStyle = "rgba(245,243,236,0.55)";
+            ctx.font = `400 ${coordFs}px ${ffMono}`;
+            ctx.fillText(
+              formatLatLonShort(result.mountain.lat, result.mountain.lon),
+              infoX,
+              infoY + coordFs,
+            );
+          } else {
+            ctx.fillStyle = "#f5f3ec";
+            ctx.font = `700 ${nameFs}px ${ffName}`;
+            ctx.fillText("撮影地点", infoX, infoY + nameFs);
+            infoY += nameFs + Math.round(nameFs * 0.18);
+            ctx.fillStyle = "rgba(245,243,236,0.55)";
+            ctx.font = `400 ${coordFs}px ${ffMono}`;
+            ctx.fillText(formatLatLonShort(arLoc.lat, arLoc.lon), infoX, infoY + coordFs);
+          }
+        }
+        // 出典クレジット（小さく、スタンプと反対側の下部に）。
+        const credFs = Math.round(SHORT * 0.012);
+        const credText = "地図・標高データ：国土地理院タイル";
+        ctx.save();
+        ctx.font = `400 ${credFs}px ${roleFontStack(roleFonts.captionBody)}`;
+        ctx.textBaseline = "alphabetic";
+        ctx.fillStyle = "rgba(245,243,236,0.55)";
+        if (stampCorner === "bl") {
+          ctx.textAlign = "right";
+          ctx.fillText(credText, OW - margin, OH - margin);
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(credText, margin, OH - margin);
         }
         ctx.restore();
       }
@@ -3735,6 +3912,37 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                   ))}
                 </div>
               )}
+            {/* 3Dミニマップ・スタンプのプレビュー。オン時のみ。書き出しは bakeComposite が再生成。
+                対象山が見つからない場合（peak 未選択 ＋ 近傍に山岳データ無し）は
+                撮影地点の座標だけを表示し、トグルが効いていることが分かるようにする。 */}
+            {stampOn && stampPreview && (
+              <div
+                className={`ar-stamp ar-stamp--${stampCorner}`}
+                style={{ "--stamp-accent": stampAccent } as React.CSSProperties}
+              >
+                <img src={stampPreview.url} alt="" className="ar-stamp-img" draggable={false} />
+                {stampShowInfo && (
+                  <div className="ar-stamp-info">
+                    {stampPreview.mountain ? (
+                      <>
+                        <div className="ar-stamp-name">{stampPreview.mountain.name}</div>
+                        <div className="ar-stamp-meta">
+                          <span className="ar-stamp-elev">{Math.round(stampPreview.mountain.elevationM)}m</span>
+                        </div>
+                        <div className="ar-stamp-coord">
+                          {formatLatLonShort(stampPreview.mountain.lat, stampPreview.mountain.lon)}
+                        </div>
+                      </>
+                    ) : arLoc ? (
+                      <>
+                        <div className="ar-stamp-name">撮影地点</div>
+                        <div className="ar-stamp-coord">{formatLatLonShort(arLoc.lat, arLoc.lon)}</div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
             </div>
           </div>
           <div
@@ -4108,6 +4316,165 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                         ),
                       }
                     : null,
+                  {
+                    id: "stamp",
+                    label: (
+                      <>
+                        <IconMap size={13} /> ミニマップ
+                      </>
+                    ),
+                    content: (
+                      <>
+                        {arSec(
+                          "stamp-common",
+                          "コモン",
+                          <>
+                            <label className="switch-row">
+                              <span>3Dミニマップを入れる</span>
+                              <input
+                                type="checkbox"
+                                className="switch"
+                                checked={stampOn}
+                                onChange={(e) => setStampOn(e.target.checked)}
+                              />
+                            </label>
+                            {stampOn && (
+                              <>
+                                <div className="ar-fs-row">
+                                  <span>スタイル</span>
+                                  <div className="seg" role="group" aria-label="地形スタイル">
+                                    {(
+                                      [
+                                        ["等高線", "contour"],
+                                        ["陰影", "shaded"],
+                                        ["ワイヤー", "wire"],
+                                      ] as [string, StampStyle][]
+                                    ).map(([lab, v]) => (
+                                      <button
+                                        key={v}
+                                        className={stampStyle === v ? "is-active" : ""}
+                                        onClick={() => setStampStyle(v)}
+                                      >
+                                        {lab}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="ar-fs-row">
+                                  <span>位置</span>
+                                  <div className="seg" role="group" aria-label="スタンプの位置">
+                                    {(
+                                      [
+                                        ["左上", "tl"],
+                                        ["右上", "tr"],
+                                        ["左下", "bl"],
+                                        ["右下", "br"],
+                                      ] as [string, "tl" | "tr" | "bl" | "br"][]
+                                    ).map(([lab, v]) => (
+                                      <button
+                                        key={v}
+                                        className={stampCorner === v ? "is-active" : ""}
+                                        onClick={() => setStampCorner(v)}
+                                      >
+                                        {lab}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="ar-fs-row">
+                                  <span>向き</span>
+                                  <div className="seg" role="group" aria-label="スタンプの向き">
+                                    <button
+                                      className={stampOrient === "heading" ? "is-active" : ""}
+                                      onClick={() => setStampOrient("heading")}
+                                      disabled={arHeadingDeg == null}
+                                      title={arHeadingDeg == null ? "撮影方位の情報がありません" : ""}
+                                    >
+                                      撮影方位
+                                    </button>
+                                    <button
+                                      className={stampOrient === "north" ? "is-active" : ""}
+                                      onClick={() => setStampOrient("north")}
+                                    >
+                                      北を上
+                                    </button>
+                                  </div>
+                                </div>
+                                {arHeadingDeg == null && (
+                                  <p className="dock-announce" style={{ fontSize: "0.75em", opacity: 0.7 }}>
+                                    撮影方位の情報がありません。北上で表示します。
+                                  </p>
+                                )}
+                                <label className="switch-row">
+                                  <span>情報（山名・標高・座標）</span>
+                                  <input
+                                    type="checkbox"
+                                    className="switch"
+                                    checked={stampShowInfo}
+                                    onChange={(e) => setStampShowInfo(e.target.checked)}
+                                  />
+                                </label>
+                              </>
+                            )}
+                          </>,
+                        )}
+                        {stampOn &&
+                          arSec(
+                            "stamp-range",
+                            "範囲",
+                            <>
+                              <div className="ar-fs-slider-row">
+                                <span>範囲</span>
+                                <span className="ar-fs-val">{stampRangeKm.toFixed(1)} km</span>
+                              </div>
+                              <input
+                                type="range"
+                                className="ar-fs-slider"
+                                min={1.5}
+                                max={15}
+                                step={0.5}
+                                value={stampRangeKm}
+                                onChange={(e) => setStampRangeKm(Number(e.target.value))}
+                                aria-label="スタンプの範囲(km)"
+                              />
+                            </>,
+                          )}
+                        {/* アクセント色は「陰影」スタイルでは可視化要素がほぼ無い（ピン頭のみ）ため非表示。 */}
+                        {stampOn &&
+                          stampStyle !== "shaded" &&
+                          arSec(
+                            "stamp-color",
+                            "アクセント色",
+                            <>
+                              <div className="ar-fs-row">
+                                <span>アクセント色</span>
+                                <input
+                                  type="color"
+                                  className="ar-color-input"
+                                  value={stampAccent}
+                                  onChange={(e) => setStampAccent(e.target.value)}
+                                  aria-label="スタンプのアクセント色"
+                                />
+                              </div>
+                              <div className="ar-caption-pick">
+                                {["#d8ff4a", "#8be1ff", "#ffb95a", "#ff7a8a", "#ffffff"].map((c) => (
+                                  <button
+                                    key={c}
+                                    type="button"
+                                    className={`ar-cap-chip${stampAccent.toLowerCase() === c.toLowerCase() ? " is-on" : ""}`}
+                                    style={{ background: c, color: "#0e1620" }}
+                                    onClick={() => setStampAccent(c)}
+                                    aria-label={`アクセント色 ${c}`}
+                                  >
+                                    ●
+                                  </button>
+                                ))}
+                              </div>
+                            </>,
+                          )}
+                      </>
+                    ),
+                  },
                   {
                     id: "crop",
                     label: (

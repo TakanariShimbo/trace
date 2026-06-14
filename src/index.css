@@ -2972,6 +2972,55 @@ body,
 .ar-fs-val,
 .slider-label b,
 .stage-zoom-val,
-.peak-clear b {
+.peak-clear b,
+.ar-stamp-elev,
+.ar-stamp-coord {
   font-family: var(--font-mono);
+}
+
+/* 3Dミニマップ・スタンプ（写真ARの仕上げで写真の隅に重ねるカード）。PR#33: ミニマップ機能 */
+.ar-stamp {
+  position: absolute;
+  width: 30cqmin;
+  background: rgba(8, 12, 17, 0.66);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.2cqmin;
+  padding: 1.2cqmin;
+  box-shadow: 0 1cqmin 2.4cqmin rgba(0, 0, 0, 0.32);
+  pointer-events: none;
+  color: #f5f3ec;
+  z-index: 5;
+  box-sizing: border-box;
+}
+.ar-stamp--br { right: 3cqmin; bottom: 3cqmin; }
+.ar-stamp--bl { left: 3cqmin; bottom: 3cqmin; }
+.ar-stamp--tr { right: 3cqmin; top: 3cqmin; }
+.ar-stamp--tl { left: 3cqmin; top: 3cqmin; }
+.ar-stamp-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: 0.6cqmin;
+}
+/* 情報ブロック。フォントは既存ラベル（2.7cqmax 基準）と桁を合わせ、
+   30cqmin 幅のカード内で読める大きさを確保する。 */
+.ar-stamp-info {
+  margin-top: 1cqmin;
+  line-height: 1.22;
+}
+.ar-stamp-name {
+  font-weight: 700;
+  font-size: 2.4cqmin;
+  letter-spacing: 0.01em;
+}
+.ar-stamp-meta {
+  margin-top: 0.4cqmin;
+  font-size: 1.95cqmin;
+  color: var(--stamp-accent, #d8ff4a);
+}
+.ar-stamp-coord {
+  margin-top: 0.3cqmin;
+  font-size: 1.55cqmin;
+  color: rgba(245, 243, 236, 0.6);
 }
