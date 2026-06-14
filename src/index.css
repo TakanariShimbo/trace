@@ -51,7 +51,7 @@ body,
   border-radius: 6px;
 }
 .attribution a {
-  color: #9fc1ec;
+  color: #c9b079;
 }
 
 /* --- 地名検索（上中央） --- */
@@ -1024,7 +1024,7 @@ body,
 .moon-cyc.is-now {
   opacity: 1;
   background: rgba(214, 180, 106, 0.28);
-  box-shadow: inset 0 0 0 1px rgba(130, 185, 240, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(214, 180, 106, 0.6);
 }
 
 .sky-times {
@@ -1274,7 +1274,7 @@ body,
 }
 .save-link {
   font-size: 12px;
-  color: #79a6e0;
+  color: #d6b46a;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -1483,7 +1483,7 @@ body,
   cursor: pointer;
 }
 .ar-intro-pick:hover {
-  background: rgba(94, 150, 214, 0.95);
+  background: rgba(228, 197, 132, 0.98); /* ホバーで青に化けていたのを金の明色に */
 }
 
 /* --- ARウィザード（地点 → 情報 → 合わせる） --- */
@@ -2191,6 +2191,7 @@ body,
 .ar-fs-slider {
   width: 100%;
   margin: 2px 0 2px;
+  accent-color: #d6b46a; /* 他のスライダーと同じ金に（既定の青を上書き） */
 }
 /* フォント選択（役割ごとに和文＋欧文セットを1つ選ぶ）。 */
 .ar-font-sel {
@@ -2321,7 +2322,7 @@ body,
   stroke-width: 1.2;
 }
 .compass-wedge {
-  fill: rgba(95, 160, 230, 0.38);
+  fill: rgba(214, 180, 106, 0.32);
   stroke: rgba(214, 180, 106, 0.7);
   stroke-width: 0.6;
 }
