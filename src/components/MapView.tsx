@@ -4393,23 +4393,6 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                                   </div>
                                 </div>
                                 <div className="ar-fs-row">
-                                  <span>位置</span>
-                                  <div className="seg" role="group" aria-label="スタンプの位置（写真上のドラッグでも移動可）">
-                                    {(
-                                      [
-                                        ["左上", 0.04, 0.04],
-                                        ["右上", 0.62, 0.04],
-                                        ["左下", 0.04, 0.6],
-                                        ["右下", 0.62, 0.6],
-                                      ] as [string, number, number][]
-                                    ).map(([lab, pu, pv]) => (
-                                      <button key={lab} onClick={() => setStampPos({ u: pu, v: pv })}>
-                                        {lab}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                                <div className="ar-fs-row">
                                   <span>向き</span>
                                   <div className="seg" role="group" aria-label="スタンプの向き">
                                     <button
