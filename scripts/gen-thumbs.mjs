@@ -17,8 +17,9 @@ const outDir = path.join(root, "public", "thumbs");
 fs.mkdirSync(outDir, { recursive: true });
 
 const mountains = JSON.parse(fs.readFileSync(path.join(root, "public", "data", "mountains.json"), "utf8"));
-// 有名順(priority)→標高で、よく見られる山から先に作る。
-mountains.sort((a, b) => b.priority - a.priority || b.elevation_m - a.elevation_m);
+// 地理的に近い順（北→南、同緯度内は西→東）で作る。隣接する山は地形タイルを共有するので、
+// 1サイクル内でキャッシュが効いて高速化する（表示順はアプリ側で別管理なので影響なし）。
+mountains.sort((a, b) => b.latitude - a.latitude || a.longitude - b.longitude);
 
 const chunkSize = Number(process.argv[2] || 8);
 const maxCount = Number(process.argv[3] || Infinity);

@@ -33,12 +33,15 @@ export default function ThumbStudio() {
 
     // 山頂を南東やや上から望む“肖像”。順光（太陽は東〜南上）で陰影が出る向き。
     const renderThumb = (lat: number, lon: number, elevM: number) =>
-      new Promise<string>((resolve) => {
+      new Promise<string>((resolve, reject) => {
         const tx = mercXToWorld(lonToMercX(lon));
         const tz = mercYToWorld(latToMercY(lat));
         const ty = elevToWorldY(Math.max(0, elevM - 250));
         const target = new THREE.Vector3(tx, ty, tz);
-        const R = 6.5 + (elevM / 3800) * 4.5;
+        // カメラ距離は山の高さにほぼ比例（低い山ほど寄る）。
+        // 旧式は基準が大きく、低山を引きで撮りすぎて点のようになっていた。
+        // ただし起伏の小さい低山は寄りすぎると“ボケた地面”になるため下限(4.0)で止める。
+        const R = Math.max(4.0, 1.4 + (elevM / 3800) * 9.3);
         const camH = elevToWorldY(elevM) + R * 0.42;
         const az = Math.PI * 0.27;
         const place = () => {
@@ -47,22 +50,42 @@ export default function ThumbStudio() {
         };
         let frames = 0;
         let settled = 0;
+        // 1枚が固まっても全体を止めないための安全装置。完了/失敗どちらでも1回だけ確定する。
+        let done = false;
+        const finish = (fn: () => void) => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          fn();
+        };
+        // タイル読込やWebGLが詰まって永久ハングするのを防ぐ壁時計タイムアウト（rAFが止まっても発火）。
+        const timer = setTimeout(() => finish(() => reject(new Error("render timeout"))), 45000);
         const tick = () => {
-          place();
-          // サムネ用に LOD を粗く（読み込むタイル数を抑えて高速化）。実画面より小さい画面高を渡す。
-          terrain.update(camera, 150, camera.position.distanceTo(target));
-          renderer.render(scene, camera);
-          frames++;
-          const s = terrain.getStats();
-          if (s.loading === 0 && s.queued === 0 && frames > 12) settled++;
-          else settled = 0;
-          // タイルが落ち着いて数フレーム描けたら確定。保険の上限は短め（サムネは粗くてOK）。
-          if (settled >= 3 || frames > 150) {
+          if (done) return;
+          try {
             place();
+            // 近接撮影でも地形のディテールが出るよう LOD を細かめに（実描画より大きい画面高を渡す）。
+            // 粗いと近接時に“平坦な緑のベタ塗り”になってしまうため、細かいタイルを要求して読み込みを待つ。
+            // 値は調整用に window.__thumbLOD で上書き可能。
+            const lod = (window as unknown as { __thumbLOD?: number }).__thumbLOD || 330;
+            terrain.update(camera, lod, camera.position.distanceTo(target));
             renderer.render(scene, camera);
-            resolve(renderer.domElement.toDataURL("image/webp", 0.78));
-          } else {
-            requestAnimationFrame(tick);
+            frames++;
+            const s = terrain.getStats();
+            if (s.loading === 0 && s.queued === 0 && frames > 16) settled++;
+            else settled = 0;
+            // タイルが落ち着いて数フレーム描けたら確定。細タイルの読込を待てるよう上限は長め。
+            if (settled >= 4 || frames > 360) {
+              place();
+              renderer.render(scene, camera);
+              const url = renderer.domElement.toDataURL("image/webp", 0.78);
+              finish(() => resolve(url));
+            } else {
+              requestAnimationFrame(tick);
+            }
+          } catch (e) {
+            // 描画例外（WebGLコンテキスト喪失など）は即失敗にして次へ。
+            finish(() => reject(e instanceof Error ? e : new Error(String(e))));
           }
         };
         requestAnimationFrame(tick);

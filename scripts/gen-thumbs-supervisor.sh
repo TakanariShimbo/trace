@@ -14,7 +14,9 @@ restart_browser() {
   echo "[sup $(date -u +%H:%M:%S)] restarting browser" >> "$LOG"
   npx --no-install playwright-cli close-all >/dev/null 2>&1
   sleep 2
-  npx --no-install playwright-cli open "$URL" >/dev/null 2>&1
+  # --persistent: ディスクにHTTPキャッシュを保持し、ブラウザ再起動をまたいでも
+  # 近隣の地形タイルを再利用する（地理順スイープと組み合わせて高速化）。
+  npx --no-install playwright-cli open "$URL" --persistent >/dev/null 2>&1
   npx --no-install playwright-cli reload >/dev/null 2>&1
   # __thumbReady になるまで最大30秒待つ
   for _ in $(seq 1 15); do
@@ -26,7 +28,9 @@ restart_browser() {
 }
 
 start_gen() {
-  node scripts/gen-thumbs.mjs 8 >> "$LOG" 2>&1 &
+  # 1サイクル15枚で終了させ、毎回ブラウザを作り直す。LOD330は約20枚でWebGLが劣化し
+  # 以降が全滅するため、劣化前(15枚)に予防的にリフレッシュする（gen終了→restart_browser→再開）。
+  node scripts/gen-thumbs.mjs 5 15 >> "$LOG" 2>&1 &
   GENPID=$!
   GENSTART=$(count)
 }
@@ -43,7 +47,7 @@ stall=0
 deadpass=0
 
 while true; do
-  sleep 60
+  sleep 20
   total=$(count)
 
   if [ "$total" -ge "$TARGET" ]; then
@@ -71,14 +75,15 @@ while true; do
     continue
   fi
 
-  # 進捗チェック（60秒ごと、4回連続=約4分 進まなければストール扱い）
+  # 進捗チェック（20秒ごと、18回連続=約6分 進まなければストール扱い）。
+  # 1サイクル15枚は通常 数分で終わるので、6分の無進捗は本当の異常とみなせる。
   if [ "$total" -le "$prev" ]; then
     stall=$((stall+1))
   else
     stall=0
     prev=$total
   fi
-  if [ "$stall" -ge 4 ]; then
+  if [ "$stall" -ge 18 ]; then
     echo "[sup $(date -u +%H:%M:%S)] stall at $total; kicking browser+gen" >> "$LOG"
     kill_gen
     restart_browser

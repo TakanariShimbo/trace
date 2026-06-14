@@ -65,13 +65,20 @@ async function load(url: string): Promise<ImageBitmap | null> {
     if (hit) blob = await hit.blob();
   }
   if (!blob) {
-    let res: Response;
-    try {
-      res = await fetch(url, { mode: "cors" });
-    } catch {
-      return null;
+    // 一時的なネットワーク失敗は数回リトライする。大量読込時に fetch が例外で落ちると
+    // タイルが無地(海色)のまま“ready”確定して再取得されず、地図に無地ポリゴンが残るため。
+    // 404（=海域・データ無し）は正当なので即 null（リトライしない）。
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        res = await fetch(url, { mode: "cors" });
+        break;
+      } catch {
+        if (attempt === 2) return null;
+        await new Promise((r) => setTimeout(r, 150 * (attempt + 1)));
+      }
     }
-    if (!res.ok) return null; // 404=海域など
+    if (!res || !res.ok) return null; // 404=海域など
     blob = await res.blob();
     if (cache) await cache.put(url, new Response(blob, { headers: { "content-type": blob.type } }));
   }
