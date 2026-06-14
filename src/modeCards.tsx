@@ -27,13 +27,13 @@ export const CARDS: { mode: AppMode | "settings" | "zukan"; icon: React.ReactNod
     mode: "ar",
     icon: <IconImage size={26} />,
     title: "山を写す",
-    desc: "写真に山名ラベルを重ね、山座同定に使います。",
+    desc: "写真に山名ラベルや好きな文字を重ねて、印象的な一枚に仕上げます。",
   },
   {
     mode: "live",
     icon: <IconCamera size={26} />,
     title: "山を見分ける",
-    desc: "カメラ映像に、見えている山の名前をその場で重ねます。",
+    desc: "カメラに映る山の名前をその場で重ね、目の前の山がどれかを確かめます。",
   },
   {
     mode: "offline",
