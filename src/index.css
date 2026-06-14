@@ -2421,13 +2421,16 @@ body,
   font-size: 15px;
   outline: none;
 }
-/* 絞り込みは 2×2 で安定させる（有名順だけ落ちる不安定さを解消）。 */
+/* 絞り込みは横並び（画面幅を活かし、操作エリアを圧縮して一覧に面積を回す）。
+   狭い画面では自然に折り返す。各 select は内容ぶんの幅で詰める。 */
 .zukan-filters {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .zukan-filters select {
+  flex: 1 1 auto;
+  min-width: 0;
   height: 36px;
   padding: 0 14px;
   color: var(--fg);
@@ -2478,29 +2481,29 @@ body,
     font-size: 0;
   }
 }
-/* カード一覧。検索エリアとの間に余白を取り、カード間も少し広めに。 */
+/* カード一覧。横長カードを詰めて並べ、一覧で比較しやすく（“目次”感）。 */
 .zukan-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 12px; /* 検索/絞り込み → 一覧 ≈ 30 */
+  gap: 10px;
+  margin-top: 12px; /* 検索/絞り込み → 一覧 */
 }
-@media (max-width: 640px) {
+@media (max-width: 720px) {
   .zukan-grid {
     grid-template-columns: 1fr;
   }
 }
-/* カードは“図鑑の目次”。上に山頂の斜め3Dサムネ、下に山名・場所・タグ。 */
+/* カードは“図鑑の目次”。左に山頂の斜め3Dサムネ、中央に山名・場所・タグ、右に標高＋矢印。 */
 .zukan-card {
   display: flex;
-  flex-direction: column;
+  align-items: stretch;
   padding: 0;
   overflow: hidden;
   text-align: left;
   color: var(--fg);
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
+  border-radius: 14px;
   cursor: pointer;
   transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
@@ -2509,15 +2512,16 @@ body,
   border-color: rgba(214, 180, 106, 0.45);
   background: rgba(255, 255, 255, 0.06);
 }
-/* サムネ枠。未生成のときは暗い地形風プレースホルダのまま見せる。 */
+/* 左のサムネ（固定幅・カード高にストレッチ）。未生成は暗い地形風プレースホルダのまま。 */
 .zukan-card-thumb {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
+  position: relative;
+  flex: none;
+  width: 116px;
+  align-self: stretch;
   background:
     radial-gradient(120% 120% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
     #0c0d10;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 .zukan-card-thumb img {
   width: 100%;
@@ -2525,48 +2529,86 @@ body,
   object-fit: cover;
   display: block;
 }
-.zukan-card-body {
-  display: flex;
-  flex-direction: column;
-  padding: 16px 18px 18px;
-}
-.zukan-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-.zukan-card-name {
-  font-size: 19px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.zukan-card-elev {
-  flex: none;
-  font-size: 15px;
-  color: rgba(242, 240, 234, 0.78);
+/* 有名順のときの順位バッジ（サムネ左上）。ゴールド地に黒数字でランキング感。 */
+.zukan-card-rank {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: #0c0d10;
+  background: rgba(214, 180, 106, 0.92);
+  border-radius: 6px;
   font-variant-numeric: tabular-nums;
 }
-/* 読み / 英名（詳細ページと同じ並び）。 */
+.zukan-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 14px;
+}
+.zukan-card-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 読み / 英名（詳細ページと同じ並び）。1行に収めて省略。 */
 .zukan-card-reading {
-  margin-top: 12px;
-  font-size: 14px;
-  color: rgba(242, 240, 234, 0.56);
+  font-size: 12.5px;
+  color: rgba(242, 240, 234, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .zukan-card-en {
   opacity: 0.82;
 }
-.zukan-card-pref {
-  margin-top: 7px;
-  font-size: 14px;
-  color: rgba(242, 240, 234, 0.66);
-}
-.zukan-card-tags {
+/* 場所＋タグを補助情報として控えめに横並び。 */
+.zukan-card-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-top: 18px;
+  margin-top: 2px;
+}
+.zukan-card-pref {
+  font-size: 12.5px;
+  color: rgba(242, 240, 234, 0.62);
+}
+/* 右端：標高（指標）＋進む矢印。数字だけ少し強調し、他は控えめに。 */
+.zukan-card-aside {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 14px 12px 6px;
+  color: rgba(242, 240, 234, 0.4);
+}
+.zukan-card-elev {
+  font-size: 12px;
+  color: rgba(242, 240, 234, 0.55);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zukan-card-elev b {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(242, 240, 234, 0.9);
 }
 /* 「+N」はタグと同じ形のチップ（他タグより一段弱い）。 */
 .zukan-tag--more {
