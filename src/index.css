@@ -1966,12 +1966,14 @@ body,
 /* 「画像」モード中は注釈（名札・点・解説）を透過させ、写真のパン/ズームを優先。編集UIも隠す。 */
 .ar-edit-stage.is-image-mode .ar-edit-label,
 .ar-edit-stage.is-image-mode .ar-edit-dot,
-.ar-edit-stage.is-image-mode .ar-caption {
+.ar-edit-stage.is-image-mode .ar-caption,
+.ar-edit-stage.is-image-mode .ar-stamp {
   pointer-events: none;
 }
 .ar-edit-stage.is-image-mode .ar-cap-handle,
 .ar-edit-stage.is-image-mode .ar-caption::before,
 .ar-edit-stage.is-image-mode .ar-edit-label::before,
+.ar-edit-stage.is-image-mode .ar-stamp::before,
 .ar-edit-stage.is-image-mode .ar-edit-chrome,
 .ar-edit-stage.is-image-mode .ar-cap-divider::before {
   display: none;
@@ -2987,10 +2989,26 @@ body,
   border-radius: 1.2cqmin;
   padding: 1.2cqmin;
   box-shadow: 0 1cqmin 2.4cqmin rgba(0, 0, 0, 0.32);
-  pointer-events: none;
+  /* ラベル/解説と同じく写真内をドラッグで配置できる。 */
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   color: #f5f3ec;
   z-index: 5;
   box-sizing: border-box;
+}
+.ar-stamp:active {
+  cursor: grabbing;
+}
+/* スタンプの選択枠（ラベル/解説と同じ金枠）。編集UIのみ・出力には焼き込まれない。 */
+.ar-stamp::before {
+  content: "";
+  position: absolute;
+  inset: -0.6cqmin;
+  border: 0.25cqmin solid rgba(214, 180, 106, 0.7);
+  border-radius: 1.7cqmin;
+  pointer-events: none;
 }
 .ar-stamp--br { right: 3cqmin; bottom: 3cqmin; }
 .ar-stamp--bl { left: 3cqmin; bottom: 3cqmin; }

@@ -525,7 +525,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   // 3Dミニマップ・スタンプ（写真ARの仕上げで写真の隅に焼き込む）。既定はオフ。
   const [stampOn, setStampOn] = useState(false);
   const [stampStyle, setStampStyle] = useState<StampStyle>("contour");
-  const [stampCorner, setStampCorner] = useState<"br" | "bl" | "tr" | "tl">("br");
+  const [stampPos, setStampPos] = useState({ u: 0.62, v: 0.6 }); // スタンプ左上（写真座標）。ドラッグ/プリセットで移動。
   const [stampRangeKm, setStampRangeKm] = useState(5);
   const [stampAccent, setStampAccent] = useState("#d6b46a");
   const [stampShowInfo, setStampShowInfo] = useState(true);
@@ -539,6 +539,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   // 解説ブロックの配置（写真フレーム内の正規化座標。ブロック左上）。ドラッグで移動。
   const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
   const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
+  const stampDragRef = useRef<{ offU: number; offV: number } | null>(null); // スタンプドラッグの掴み位置
   const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
   const arLocRef = useRef<{ lat: number; lon: number } | null>(null); // 撮影地点（2D/3D切替の中心に使う）
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
@@ -605,7 +606,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     if (dir === "l") return { ...base, top: 0, bottom: 0, left: 0, width: pct, background: grad("to right") };
     return { ...base, top: 0, bottom: 0, right: 0, width: pct, background: grad("to left") };
   };
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" | "stamp" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -2522,10 +2523,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         const infoH = stampShowInfo && result.mountain ? Math.round(SHORT * 0.07) : 0;
         const cardW = stampPx + cardPad * 2;
         const cardH = stampPx + cardPad * 2 + infoH;
-        const cardX =
-          stampCorner === "br" || stampCorner === "tr" ? OW - margin - cardW : margin;
-        const cardY =
-          stampCorner === "br" || stampCorner === "bl" ? OH - margin - cardH : margin;
+        // スタンプ左上（写真座標）を出力座標へ。フレーム内に収める。
+        const cardX = Math.min(Math.max(0, Math.round(pfx(stampPos.u))), Math.max(0, OW - cardW));
+        const cardY = Math.min(Math.max(0, Math.round(pfy(stampPos.v))), Math.max(0, OH - cardH));
         ctx.save();
         ctx.shadowColor = "rgba(0,0,0,0.32)";
         ctx.shadowBlur = Math.round(SHORT * 0.018);
@@ -2591,7 +2591,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         ctx.font = `400 ${credFs}px ${roleFontStack(roleFonts.captionBody)}`;
         ctx.textBaseline = "alphabetic";
         ctx.fillStyle = "rgba(245,243,236,0.55)";
-        if (stampCorner === "bl") {
+        // スタンプが左下寄りなら、クレジットは反対の右下へ（重なり回避）。
+        if (stampPos.u < 0.4 && stampPos.v > 0.5) {
           ctx.textAlign = "right";
           ctx.fillText(credText, OW - margin, OH - margin);
         } else {
@@ -2672,6 +2673,22 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     }
     arDragRef.current = { i: -1, kind: "caption" };
   };
+  // 地形スタンプのドラッグ開始（解説と同じ要領で、掴んだ位置とカード左上のズレを記録）。
+  const onStampDown = (e: React.PointerEvent) => {
+    if (arExportMode === "image") return; // 画像モードは写真パン優先
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    const stage = arFrameRef.current;
+    if (stage) {
+      const r = stage.getBoundingClientRect();
+      const pu = (e.clientX - r.left) / r.width;
+      const pv = (e.clientY - r.top) / r.height;
+      const sf = photoToFrame(stampPos.u, stampPos.v);
+      stampDragRef.current = { offU: pu - sf.u, offV: pv - sf.v };
+    }
+    arDragRef.current = { i: -1, kind: "stamp" };
+  };
   // 解説ブロックのリサイズ（4辺のハンドル）。右/左=幅、上/下=縦に伸ばすと幅が狭まる。文字サイズは固定。
   const onCapResizeDown = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -2743,6 +2760,14 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       const fU = Math.min(maxU, Math.max(0, u - off.offU));
       const fV = Math.min(0.82, Math.max(0, v - off.offV));
       setCaptionPos(frameToPhoto(fU, fV)); // 保持は写真座標（クロップ/余白に追従）
+      return;
+    }
+    if (d.kind === "stamp") {
+      const off = stampDragRef.current ?? { offU: 0, offV: 0 };
+      // カードがフレーム内に概ね収まるようクランプ（幅≈0.30/高さ≈0.34の短辺基準）。
+      const fU = Math.min(0.72, Math.max(0, u - off.offU));
+      const fV = Math.min(0.66, Math.max(0, v - off.offV));
+      setStampPos(frameToPhoto(fU, fV));
       return;
     }
     if (d.kind === "capResize") {
@@ -3917,8 +3942,15 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 撮影地点の座標だけを表示し、トグルが効いていることが分かるようにする。 */}
             {stampOn && stampPreview && (
               <div
-                className={`ar-stamp ar-stamp--${stampCorner}`}
-                style={{ "--stamp-accent": stampAccent } as React.CSSProperties}
+                className="ar-stamp"
+                style={
+                  {
+                    left: `${photoToFrame(stampPos.u, stampPos.v).u * 100}%`,
+                    top: `${photoToFrame(stampPos.u, stampPos.v).v * 100}%`,
+                    "--stamp-accent": stampAccent,
+                  } as React.CSSProperties
+                }
+                onPointerDown={onStampDown}
               >
                 <img src={stampPreview.url} alt="" className="ar-stamp-img" draggable={false} />
                 {stampShowInfo && (
@@ -4362,20 +4394,16 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                                 </div>
                                 <div className="ar-fs-row">
                                   <span>位置</span>
-                                  <div className="seg" role="group" aria-label="スタンプの位置">
+                                  <div className="seg" role="group" aria-label="スタンプの位置（写真上のドラッグでも移動可）">
                                     {(
                                       [
-                                        ["左上", "tl"],
-                                        ["右上", "tr"],
-                                        ["左下", "bl"],
-                                        ["右下", "br"],
-                                      ] as [string, "tl" | "tr" | "bl" | "br"][]
-                                    ).map(([lab, v]) => (
-                                      <button
-                                        key={v}
-                                        className={stampCorner === v ? "is-active" : ""}
-                                        onClick={() => setStampCorner(v)}
-                                      >
+                                        ["左上", 0.04, 0.04],
+                                        ["右上", 0.62, 0.04],
+                                        ["左下", 0.04, 0.6],
+                                        ["右下", 0.62, 0.6],
+                                      ] as [string, number, number][]
+                                    ).map(([lab, pu, pv]) => (
+                                      <button key={lab} onClick={() => setStampPos({ u: pu, v: pv })}>
                                         {lab}
                                       </button>
                                     ))}
