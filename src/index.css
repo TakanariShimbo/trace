@@ -2726,7 +2726,7 @@ body,
   border-radius: 999px;
 }
 .zukan-fact svg {
-  color: rgba(255, 255, 255, 0.5);
+  color: #b79a62; /* JA/EN ラベルと同じテーマアクセント（金）でそろえる */
 }
 .zukan-fact b {
   color: var(--fg);
