@@ -55,7 +55,7 @@ export type TerrainStampResult = {
 const DEFAULTS = {
   rangeKm: 3,
   style: "contour" as StampStyle,
-  accent: "#d8ff4a",
+  accent: "#d6b46a",
   orientationMode: "heading" as StampOrientation,
   size: 512,
 };

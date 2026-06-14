@@ -527,7 +527,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [stampStyle, setStampStyle] = useState<StampStyle>("contour");
   const [stampCorner, setStampCorner] = useState<"br" | "bl" | "tr" | "tl">("br");
   const [stampRangeKm, setStampRangeKm] = useState(5);
-  const [stampAccent, setStampAccent] = useState("#d8ff4a");
+  const [stampAccent, setStampAccent] = useState("#d6b46a");
   const [stampShowInfo, setStampShowInfo] = useState(true);
   const [stampOrient, setStampOrient] = useState<StampOrientation>("heading");
   // プレビュー用のスタンプ画像（PNG dataURL）と山情報。書き出しは bakeComposite で都度再生成。
@@ -4457,7 +4457,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                                 />
                               </div>
                               <div className="ar-caption-pick">
-                                {["#d8ff4a", "#8be1ff", "#ffb95a", "#ff7a8a", "#ffffff"].map((c) => (
+                                {["#d6b46a", "#8be1ff", "#ffb95a", "#ff7a8a", "#ffffff"].map((c) => (
                                   <button
                                     key={c}
                                     type="button"
