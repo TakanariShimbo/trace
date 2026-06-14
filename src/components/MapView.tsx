@@ -4457,7 +4457,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                                 />
                               </div>
                               <div className="ar-caption-pick">
-                                {["#d6b46a", "#8be1ff", "#ffb95a", "#ff7a8a", "#ffffff"].map((c) => (
+                                {["#d6b46a", "#8be1ff", "#d8ff4a", "#ff7a8a", "#ffffff"].map((c) => (
                                   <button
                                     key={c}
                                     type="button"
