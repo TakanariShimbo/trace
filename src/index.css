@@ -1760,6 +1760,60 @@ body,
   z-index: 22;
   touch-action: none; /* 余白ドラッグでパン（スクロールさせない） */
 }
+/* [仮] 現在の設定を JSON 出力するオーバーレイ。 */
+.ar-dump {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 6, 10, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ar-dump-card {
+  width: min(640px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: #0e141d;
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 14px;
+}
+.ar-dump-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f3eedf;
+}
+.ar-dump-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(214, 224, 236, 0.62);
+}
+.ar-dump-text {
+  flex: 1;
+  min-height: 280px;
+  resize: vertical;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #e6edf5;
+  background: #06080c;
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 10px;
+  white-space: pre;
+}
+.ar-dump-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 /* 仕上げのテンプレート選択（export に入った直後の入口画面）。 */
 .ar-tpl {
   position: absolute;

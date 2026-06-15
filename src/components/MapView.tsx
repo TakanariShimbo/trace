@@ -659,6 +659,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   // 仕上げ画面の表示モード。export に入った直後はテンプレ選択、選ぶと編集へ。
   const [exportView, setExportView] = useState<"template" | "edit">("template");
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null); // 適用中テンプレ（いじると custom=null）
+  const [styleDump, setStyleDump] = useState<string | null>(null); // [仮] 現在の設定を JSON 出力するためのテキスト
   // プレビュー用のスタンプ画像（PNG dataURL）と山情報。書き出しは bakeComposite で都度再生成。
   const [stampPreview, setStampPreview] = useState<{
     url: string;
@@ -2807,6 +2808,44 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setActiveTemplateId(t.id);
     setExportView("edit");
   };
+  // [仮] 現在の仕上げ設定を ExportStyle 形式の JSON で書き出す（テンプレ微調整の共有用）。
+  // 位置(captionPos など)は写真依存なので含めない。出力はクリップボードにもコピー。
+  const dumpCurrentStyle = () => {
+    const style: ExportStyle = {
+      bakeLabels,
+      labelMode,
+      labelBg,
+      labelColor,
+      labelShadow,
+      labelNameScale,
+      labelSubScale,
+      captionLang,
+      captionLayout,
+      captionLength,
+      captionBg,
+      captionColor,
+      captionShadow,
+      captionTitleScale,
+      captionBodyScale,
+      tagColor,
+      tagColorTarget,
+      roleFonts,
+      stampOn,
+      stampStyle,
+      stampRangeKm,
+      stampAccent,
+      stampShowInfo,
+      stampOrient,
+      stampPos,
+      frameMargin,
+      frameMarginColor,
+      cropInset,
+      frameFade,
+    };
+    const json = JSON.stringify(style, null, 2);
+    setStyleDump(json);
+    navigator.clipboard?.writeText(json).catch(() => {});
+  };
   // 仕上げ(⑤)→ 微調整(④)へ戻る。
   const backToAlignFromExport = () => {
     setArStep("align");
@@ -3922,6 +3961,23 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
           </div>
         </div>
       )}
+      {styleDump !== null && (
+        <div className="ar-dump" onClick={() => setStyleDump(null)}>
+          <div className="ar-dump-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ar-dump-head">
+              <span>現在の設定（ExportStyle JSON）</span>
+              <span className="ar-dump-note">クリップボードにコピー済み。これを貼って共有してください。</span>
+            </div>
+            <textarea className="ar-dump-text" readOnly value={styleDump} onFocus={(e) => e.currentTarget.select()} />
+            <div className="ar-dump-actions">
+              <button className="ar-btn-sub" onClick={() => navigator.clipboard?.writeText(styleDump).catch(() => {})}>
+                もう一度コピー
+              </button>
+              <button className="ar-btn-main" onClick={() => setStyleDump(null)}>閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
       {appMode === "ar" && arStep === "export" && exportView === "edit" && (
         <div className="ar-edit">
           <div
@@ -4828,6 +4884,13 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     onClick={() => setExportView("template")}
                   >
                     テンプレート
+                  </button>
+                  <button
+                    className="ar-btn-sub"
+                    title="[仮] 現在の設定をJSONで出力（クリップボードにもコピー）"
+                    onClick={dumpCurrentStyle}
+                  >
+                    設定を出力
                   </button>
                   <button className="ar-btn-main" disabled={arLabels.length === 0} onClick={downloadComposite}>
                     <IconDownload size={15} />
