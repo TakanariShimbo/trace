@@ -227,6 +227,132 @@ const roleFontStack = (id: FontPairId) => {
   return `"${p.en}", "${p.jp}", system-ui, sans-serif`;
 };
 
+// 仕上げ画面のテンプレート。選ぶと「見た目＋構図」をまとめて適用する値の束。
+// 名札やスタンプの“絶対位置”は写真ごとの内容なので含めない（スタンプ位置だけはプリセットとして持つ）。
+type ExportStyle = {
+  bakeLabels: boolean;
+  labelMode: LabelMode;
+  labelBg: BgPanel;
+  labelColor: string;
+  labelShadow: boolean;
+  labelNameScale: number;
+  labelSubScale: number;
+  captionLang: "ja" | "en" | "both" | "none";
+  captionLayout: "horizontal" | "vertical";
+  captionLength: "long" | "short";
+  captionBg: BgPanel;
+  captionColor: string;
+  captionShadow: boolean;
+  captionTitleScale: number;
+  captionBodyScale: number;
+  tagColor: string;
+  tagColorTarget: "bg" | "text";
+  roleFonts: RoleFonts;
+  stampOn: boolean;
+  stampStyle: StampStyle;
+  stampRangeKm: number;
+  stampAccent: string;
+  stampShowInfo: boolean;
+  stampOrient: StampOrientation;
+  stampPos: { u: number; v: number };
+  frameMargin: { t: number; r: number; b: number; l: number };
+  frameMarginColor: string;
+  cropInset: { l: number; t: number; r: number; b: number };
+  frameFade: number;
+};
+type ExportTemplate = { id: string; name: string; hint: string; style: ExportStyle };
+
+const GOLD = "#d6b46a";
+const NO_MARGIN = { t: 0, r: 0, b: 0, l: 0 };
+const NO_CROP = { l: 0, t: 0, r: 0, b: 0 };
+// 全テンプレ共通の素の値。各テンプレは差分だけ上書きして可読性を上げる。
+const BASE_STYLE: ExportStyle = {
+  bakeLabels: true,
+  labelMode: "jaSubElev",
+  labelBg: "none",
+  labelColor: "#ffffff",
+  labelShadow: true,
+  labelNameScale: 1,
+  labelSubScale: 1,
+  captionLang: "none",
+  captionLayout: "horizontal",
+  captionLength: "short",
+  captionBg: "none",
+  captionColor: "#ffffff",
+  captionShadow: true,
+  captionTitleScale: 1,
+  captionBodyScale: 1,
+  tagColor: GOLD,
+  tagColorTarget: "bg",
+  roleFonts: DEFAULT_ROLE_FONTS,
+  stampOn: false,
+  stampStyle: "contour",
+  stampRangeKm: 5,
+  stampAccent: GOLD,
+  stampShowInfo: true,
+  stampOrient: "heading",
+  stampPos: { u: 0.62, v: 0.6 },
+  frameMargin: NO_MARGIN,
+  frameMarginColor: "#ffffff",
+  cropInset: NO_CROP,
+  frameFade: 0,
+};
+const EXPORT_TEMPLATES: ExportTemplate[] = [
+  {
+    id: "simple",
+    name: "シンプル",
+    hint: "山名だけを控えめに重ねる、すっきりした一枚。",
+    style: { ...BASE_STYLE, labelMode: "jaOnly" },
+  },
+  {
+    id: "standard",
+    name: "標準",
+    hint: "山名・英語名・標高をバランスよく表示。",
+    style: { ...BASE_STYLE, labelMode: "jaSubEnElev" },
+  },
+  {
+    id: "described",
+    name: "解説つき",
+    hint: "山名に加え、選んだ山の短い解説を添える。",
+    style: {
+      ...BASE_STYLE,
+      labelMode: "jaSubElev",
+      captionLang: "ja",
+      captionLength: "short",
+      captionBg: "translucent",
+      roleFonts: { labelName: "mincho", labelSub: "mincho", captionTitle: "mincho", captionBody: "mincho" },
+    },
+  },
+  {
+    id: "map",
+    name: "地図つき",
+    hint: "3Dミニマップを右下に入れて、位置感を添える。",
+    style: {
+      ...BASE_STYLE,
+      labelMode: "jaSubElev",
+      stampOn: true,
+      stampStyle: "contour",
+      stampShowInfo: true,
+      stampPos: { u: 0.62, v: 0.6 },
+    },
+  },
+  {
+    id: "poster",
+    name: "作品風",
+    hint: "下に余白と白フチをとり、雑誌・ポスター風に。",
+    style: {
+      ...BASE_STYLE,
+      labelMode: "jaSubEn",
+      captionLang: "ja",
+      captionLength: "short",
+      roleFonts: { labelName: "posterMincho", labelSub: "posterMincho", captionTitle: "posterMincho", captionBody: "posterMincho" },
+      frameMargin: { t: 0, r: 0, b: 0.14, l: 0 },
+      frameMarginColor: "#ffffff",
+      frameFade: 0.04,
+    },
+  },
+];
+
 export default function MapView({ appMode, onHome, settings, initialTarget }: MapViewProps) {
   // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
   const arLike = appMode === "ar" || appMode === "live";
@@ -530,6 +656,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [stampAccent, setStampAccent] = useState("#d6b46a");
   const [stampShowInfo, setStampShowInfo] = useState(true);
   const [stampOrient, setStampOrient] = useState<StampOrientation>("heading");
+  // 仕上げ画面の表示モード。export に入った直後はテンプレ選択、選ぶと編集へ。
+  const [exportView, setExportView] = useState<"template" | "edit">("template");
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null); // 適用中テンプレ（いじると custom=null）
   // プレビュー用のスタンプ画像（PNG dataURL）と山情報。書き出しは bakeComposite で都度再生成。
   const [stampPreview, setStampPreview] = useState<{
     url: string;
@@ -540,6 +669,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [captionPos, setCaptionPos] = useState({ u: 0.05, v: 0.62 });
   const captionDragRef = useRef<{ offU: number; offV: number } | null>(null); // 解説ドラッグの掴み位置
   const stampDragRef = useRef<{ offU: number; offV: number } | null>(null); // スタンプドラッグの掴み位置
+  const stampElRef = useRef<HTMLDivElement | null>(null); // スタンプ要素（移動中は直接 DOM を動かす）
+  const stampPendingRef = useRef<{ u: number; v: number } | null>(null); // ドラッグ確定待ちの写真座標
   const arStepRef = useRef<ArStep>(appMode === "live" ? "locate" : "upload"); // ループから参照
   const arLocRef = useRef<{ lat: number; lon: number } | null>(null); // 撮影地点（2D/3D切替の中心に使う）
   const arHeadingRef = useRef<number | null>(null); // 撮影方位（3D俯瞰の背後角に使う。toggleで再発火させたくないのでref）
@@ -2521,8 +2652,10 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         const cardPad = Math.round(SHORT * 0.012);
         const cardR = Math.round(SHORT * 0.012);
         const infoH = stampShowInfo && result.mountain ? Math.round(SHORT * 0.07) : 0;
+        // 画像は上下トリミング済みで正方形とは限らないので、実比率で高さを決める。
+        const stampImgH = Math.round(stampPx * (result.canvas.height / Math.max(1, result.canvas.width)));
         const cardW = stampPx + cardPad * 2;
-        const cardH = stampPx + cardPad * 2 + infoH;
+        const cardH = stampImgH + cardPad * 2 + infoH;
         // スタンプ左上（写真座標）を出力座標へ。フレーム内に収める。
         const cardX = Math.min(Math.max(0, Math.round(pfx(stampPos.u))), Math.max(0, OW - cardW));
         const cardY = Math.min(Math.max(0, Math.round(pfy(stampPos.v))), Math.max(0, OH - cardH));
@@ -2542,7 +2675,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         // スタンプ画像。
         const sx = cardX + cardPad;
         const sy = cardY + cardPad;
-        ctx.drawImage(result.canvas, sx, sy, stampPx, stampPx);
+        ctx.drawImage(result.canvas, sx, sy, stampPx, stampImgH);
         // 情報ブロック。山が見つかれば 名/標高/座標、見つからなければ「撮影地点」+ 座標。
         if (stampShowInfo) {
           const ffName = roleFontStack(roleFonts.captionTitle);
@@ -2552,7 +2685,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
             document.fonts.load(`400 16px "${FONT_PAIRS[roleFonts.captionBody].jp}"`).catch(() => {}),
           ]);
           const infoX = sx;
-          let infoY = sy + stampPx + Math.round(infoH * 0.18);
+          let infoY = sy + stampImgH + Math.round(infoH * 0.18);
           const nameFs = Math.round(SHORT * 0.022);
           const elevFs = Math.round(SHORT * 0.018);
           const coordFs = Math.round(SHORT * 0.014);
@@ -2636,7 +2769,43 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     const firstWithDesc = labels.findIndex((l) => l.description);
     setCaptionIdx(firstWithDesc >= 0 ? firstWithDesc : 0);
     setArLabels(labels);
+    setExportView("template"); // 仕上げに入ったら、まずテンプレ選択から
     setArStep("export");
+  };
+  // テンプレートの値束を各 state に一括反映し、編集画面へ。
+  const applyTemplate = (t: ExportTemplate) => {
+    const s = t.style;
+    setBakeLabels(s.bakeLabels);
+    setLabelMode(s.labelMode);
+    setLabelBg(s.labelBg);
+    setLabelColor(s.labelColor);
+    setLabelShadow(s.labelShadow);
+    setLabelNameScale(s.labelNameScale);
+    setLabelSubScale(s.labelSubScale);
+    setCaptionLang(s.captionLang);
+    setCaptionLayout(s.captionLayout);
+    setCaptionLength(s.captionLength);
+    setCaptionBg(s.captionBg);
+    setCaptionColor(s.captionColor);
+    setCaptionShadow(s.captionShadow);
+    setCaptionTitleScale(s.captionTitleScale);
+    setCaptionBodyScale(s.captionBodyScale);
+    setTagColor(s.tagColor);
+    setTagColorTarget(s.tagColorTarget);
+    setRoleFonts(s.roleFonts);
+    setStampOn(s.stampOn);
+    setStampStyle(s.stampStyle);
+    setStampRangeKm(s.stampRangeKm);
+    setStampAccent(s.stampAccent);
+    setStampShowInfo(s.stampShowInfo);
+    setStampOrient(s.stampOrient);
+    setStampPos(s.stampPos);
+    setFrameMargin(s.frameMargin);
+    setFrameMarginColor(s.frameMarginColor);
+    setCropInset(s.cropInset);
+    setFrameFade(s.frameFade);
+    setActiveTemplateId(t.id);
+    setExportView("edit");
   };
   // 仕上げ(⑤)→ 微調整(④)へ戻る。
   const backToAlignFromExport = () => {
@@ -2764,10 +2933,19 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     }
     if (d.kind === "stamp") {
       const off = stampDragRef.current ?? { offU: 0, offV: 0 };
-      // カードがフレーム内に概ね収まるようクランプ（幅≈0.30/高さ≈0.34の短辺基準）。
-      const fU = Math.min(0.72, Math.max(0, u - off.offU));
-      const fV = Math.min(0.66, Math.max(0, v - off.offV));
-      setStampPos(frameToPhoto(fU, fV));
+      const el = stampElRef.current;
+      // 実寸を測って右端・下端ぴったりまで動かせるようクランプ（要素幅/高さぶんだけ余白を残す）。
+      const sr = el?.getBoundingClientRect();
+      const wU = sr && r.width ? sr.width / r.width : 0.3;
+      const hV = sr && r.height ? sr.height / r.height : 0.34;
+      const fU = Math.min(Math.max(0, 1 - wU), Math.max(0, u - off.offU));
+      const fV = Math.min(Math.max(0, 1 - hV), Math.max(0, v - off.offV));
+      // 移動中は DOM を直接動かして巨大な再レンダーを避け、離した時に一度だけ state へ反映する。
+      if (el) {
+        el.style.left = `${fU * 100}%`;
+        el.style.top = `${fV * 100}%`;
+      }
+      stampPendingRef.current = frameToPhoto(fU, fV);
       return;
     }
     if (d.kind === "capResize") {
@@ -2818,6 +2996,11 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     );
   };
   const onEditUp = () => {
+    // スタンプは移動中 DOM 直接操作だったので、確定時に state へ反映する。
+    if (stampPendingRef.current) {
+      setStampPos(stampPendingRef.current);
+      stampPendingRef.current = null;
+    }
     arDragRef.current = null;
   };
   // 出力枠(フレーム)を、外枠(ステージ)内に「contain」で収める px サイズに設定。
@@ -2836,7 +3019,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     }
     frame.style.width = `${Math.round(w)}px`;
     frame.style.height = `${Math.round(h)}px`;
-  }, [frameAR, measureTick, arStep, arExportMode]);
+    // exportView を含めるのは、テンプレ選択画面→編集に戻ると .ar-edit が再マウントされ、
+    // 新しいフレーム DOM に px サイズを設定し直す必要があるため（無いとフレーム 0×0＝黒画面）。
+  }, [frameAR, measureTick, arStep, arExportMode, exportView]);
   // ラベル実寸を測って正規化で保持（引き出し線の辺アンカー計算に使う）。
   // 位置(labelU/V)ドラッグでは寸法は変わらないので、変化時のみ state を更新。
   useLayoutEffect(() => {
@@ -2871,7 +3056,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     const ro = new ResizeObserver(() => setMeasureTick((t) => t + 1));
     ro.observe(stage);
     return () => ro.disconnect();
-  }, [arStep, appMode]);
+    // exportView を含めるのは、テンプレ選択→編集で .ar-edit-stage が新しい要素に
+    // 差し替わるため、ResizeObserver を新ステージへ繋ぎ直す必要があるから。
+  }, [arStep, appMode, exportView]);
   const changeCamEyeHeight = (m: number) => {
     setCamEyeHeight(m);
     apiRef.current?.setCamEyeHeight(m);
@@ -3368,11 +3555,19 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const announce = (text: React.ReactNode) => <p className="dock-announce">{text}</p>;
   // 折りたたみセクション（コモン/メイン/タグ など）。非制御の <details>（既定は畳む）。
   // React は変化のない open プロップを再適用しないので、スライダー操作の再描画でも開閉状態は保たれる。
+  // <details> を flex 化すると summary 以降が匿名コンテンツボックスにまとまり flex gap が
+  // 行間に効かない。中身を専用の flex コンテナ(.ar-sec-body)で包み、行間を確実に効かせる。
   const arSec = (key: string, title: string, children: React.ReactNode) => (
     <details key={key} className="ar-sec">
       <summary>{title}</summary>
-      {children}
+      <div className="ar-sec-body">{children}</div>
     </details>
+  );
+  // 折りたたまないセクション（中身を常に表示）。余白・区切り線は arSec と同じ見た目を流用。
+  const arFlat = (key: string, _title: string, children: React.ReactNode) => (
+    <div key={key} className="ar-sec ar-flat">
+      {children}
+    </div>
   );
   type DockTab = { id: string; label: React.ReactNode; content: React.ReactNode };
   // パネル内のセクションをタブ化（key ごとに選択を保持）。1項目だけのときはタブ列を出さない。
@@ -3695,7 +3890,39 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       {/* ⑤ 出力(仕上げ): 写真に名札・点を重ね、ドラッグで微調整してからダウンロード。
           画像枠は微調整(④)と同じ arStageRect で配置（render loop が left/top/w/h を設定）。
           パネルは①〜④と同じ統一シェル（グリップ＝ステップ＋折り畳み、本体＝ヒント＋操作）。 */}
-      {appMode === "ar" && arStep === "export" && (
+      {appMode === "ar" && arStep === "export" && exportView === "template" && (
+        <div className="ar-tpl">
+          <div className="ar-tpl-head">
+            <h2 className="ar-tpl-title">仕上げのテンプレートを選ぶ</h2>
+            <p className="ar-tpl-sub">まず雰囲気を選ぶと、文字・色・解説・ミニマップ・余白などが一括で整います。あとから細かく調整できます。</p>
+          </div>
+          <div className="ar-tpl-grid">
+            {EXPORT_TEMPLATES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`ar-tpl-card${activeTemplateId === t.id ? " is-active" : ""}`}
+                onClick={() => applyTemplate(t)}
+              >
+                <span className="ar-tpl-card-name">{t.name}</span>
+                <span className="ar-tpl-card-hint">{t.hint}</span>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="ar-tpl-card ar-tpl-card--custom"
+              onClick={() => setExportView("edit")}
+            >
+              <span className="ar-tpl-card-name">自分で設定</span>
+              <span className="ar-tpl-card-hint">テンプレートを使わず、最初から自分で仕上げる。</span>
+            </button>
+          </div>
+          <div className="ar-tpl-foot">
+            <button className="ar-btn-sub" onClick={backToAlignFromExport}>微調整へ戻る</button>
+          </div>
+        </div>
+      )}
+      {appMode === "ar" && arStep === "export" && exportView === "edit" && (
         <div className="ar-edit">
           <div
             className={`ar-edit-stage${arExportMode === "image" ? " is-image-mode" : ""}`}
@@ -3942,6 +4169,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 撮影地点の座標だけを表示し、トグルが効いていることが分かるようにする。 */}
             {stampOn && stampPreview && (
               <div
+                ref={stampElRef}
                 className="ar-stamp"
                 style={
                   {
@@ -3951,6 +4179,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                   } as React.CSSProperties
                 }
                 onPointerDown={onStampDown}
+                onPointerMove={onEditMove}
+                onPointerUp={onEditUp}
               >
                 <img src={stampPreview.url} alt="" className="ar-stamp-img" draggable={false} />
                 {stampShowInfo && (
@@ -4018,7 +4248,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                           <>
                             {arSec(
                               "label-common",
-                              "コモン",
+                              "共通",
                               <>
                                 <label className="switch-row">
                                   <span>写真に山名を入れる</span>
@@ -4084,7 +4314,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                             {bakeLabels &&
                               arSec(
                                 "label-main",
-                                "メイン（山名）",
+                                "山名",
                                 <>
                                   <div className="ar-fs-slider-row">
                                     <span>山名サイズ</span>
@@ -4107,7 +4337,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                               labelHasSub &&
                               arSec(
                                 "label-sub",
-                                "サブ（補足）",
+                                "補足",
                                 <>
                                   <div className="ar-fs-slider-row">
                                     <span>補足サイズ</span>
@@ -4142,7 +4372,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                           <>
                             {arSec(
                               "desc-common",
-                              "コモン",
+                              "共通",
                               <>
                                 <div className="ar-fs-row">
                                   <span>言語</span>
@@ -4249,7 +4479,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                             {bakeCaption &&
                               arSec(
                                 "desc-main",
-                                "タイトル",
+                                "山名",
                                 <>
                                   <div className="ar-fs-slider-row">
                                     <span>タイトルサイズ</span>
@@ -4315,7 +4545,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                             {bakeCaption &&
                               arSec(
                                 "desc-sub",
-                                "ディスクリプション",
+                                "本文",
                                 <>
                                   <div className="ar-fs-row">
                                     <span>長さ</span>
@@ -4357,7 +4587,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     ),
                     content: (
                       <>
-                        {arSec(
+                        {arFlat(
                           "stamp-common",
                           "コモン",
                           <>
@@ -4430,7 +4660,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                           </>,
                         )}
                         {stampOn &&
-                          arSec(
+                          arFlat(
                             "stamp-range",
                             "範囲",
                             <>
@@ -4453,7 +4683,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                         {/* アクセント色は「陰影」スタイルでは可視化要素がほぼ無い（ピン頭のみ）ため非表示。 */}
                         {stampOn &&
                           stampStyle !== "shaded" &&
-                          arSec(
+                          arFlat(
                             "stamp-color",
                             "アクセント色",
                             <>
@@ -4591,6 +4821,13 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     onClick={backToAlignFromExport}
                   >
                     <IconChevron dir="left" size={18} />
+                  </button>
+                  <button
+                    className="ar-btn-sub"
+                    title="テンプレートを選び直す"
+                    onClick={() => setExportView("template")}
+                  >
+                    テンプレート
                   </button>
                   <button className="ar-btn-main" disabled={arLabels.length === 0} onClick={downloadComposite}>
                     <IconDownload size={15} />

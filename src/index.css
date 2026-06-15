@@ -1760,6 +1760,90 @@ body,
   z-index: 22;
   touch-action: none; /* 余白ドラッグでパン（スクロールさせない） */
 }
+/* 仕上げのテンプレート選択（export に入った直後の入口画面）。 */
+.ar-tpl {
+  position: absolute;
+  inset: 0;
+  z-index: 23;
+  background: #06080c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  padding: 24px;
+  overflow-y: auto;
+}
+.ar-tpl-head {
+  text-align: center;
+  max-width: 560px;
+}
+.ar-tpl-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #f3eedf;
+}
+.ar-tpl-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(214, 224, 236, 0.7);
+}
+.ar-tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+}
+.ar-tpl-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 14px 16px;
+  min-height: 92px;
+  background: rgba(28, 36, 48, 0.85);
+  border: 1px solid rgba(130, 150, 175, 0.28);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, transform 0.06s;
+}
+.ar-tpl-card:hover {
+  background: rgba(40, 50, 66, 0.95);
+  border-color: rgba(214, 180, 106, 0.6);
+}
+.ar-tpl-card:active {
+  transform: translateY(1px);
+}
+.ar-tpl-card.is-active {
+  border-color: #d6b46a;
+  box-shadow: 0 0 0 1px rgba(214, 180, 106, 0.5) inset;
+}
+.ar-tpl-card--custom {
+  background: rgba(20, 26, 36, 0.7);
+  border-style: dashed;
+}
+.ar-tpl-card-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f3eedf;
+}
+.ar-tpl-card-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(214, 224, 236, 0.62);
+}
+.ar-tpl-foot {
+  display: flex;
+  justify-content: center;
+}
+@media (max-width: 560px) {
+  .ar-tpl-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 /* 編集ステージは微調整(④)と同じ枠(arStageRect)に合わせるため、left/top/width/height は
    render loop が px で設定する（CSSでのサイズ指定はしない）。 */
 .ar-edit-stage {
@@ -2238,6 +2322,20 @@ body,
 }
 .ar-sec:first-child {
   border-top: none;
+}
+.ar-flat {
+  border-top: none;
+}
+/* 折りたたみ（山名・解説）。展開時の中身は .ar-sec-body の flex gap で行間を確実に出す
+   （details を直接 flex 化すると匿名コンテンツボックスに包まれて gap が行間に効かないため）。 */
+details.ar-sec {
+  gap: 8px;
+  padding: 7px 0;
+}
+.ar-sec-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 .ar-sec > summary {
   cursor: pointer;
@@ -3018,13 +3116,12 @@ body,
   display: block;
   width: 100%;
   height: auto;
-  aspect-ratio: 1 / 1;
   border-radius: 0.6cqmin;
 }
 /* 情報ブロック。フォントは既存ラベル（2.7cqmax 基準）と桁を合わせ、
    30cqmin 幅のカード内で読める大きさを確保する。 */
 .ar-stamp-info {
-  margin-top: 1cqmin;
+  margin-top: 0.3cqmin;
   line-height: 1.22;
 }
 .ar-stamp-name {

@@ -517,12 +517,55 @@ export async function renderTerrainStamp(input: TerrainStampInput): Promise<Terr
     }
   }
 
+  // 俯角つき俯瞰なので地形は正方形キャンバスの上寄りに描かれ、下に透明な帯が残る。
+  // 透明な上下余白をトリミングして、カード内に無駄な空きが出ないようにする。
+  const finalCanvas = trimTransparentRows(outCanvas);
+
   return {
-    canvas: outCanvas,
+    canvas: finalCanvas,
     mountain: stampMountain,
     effectiveHeadingDeg: oriented ? headingDeg : 0,
     oriented,
   };
+}
+
+// 透明な上下の帯を切り落とす（横幅は維持）。中身が無い/全面埋まっている場合は元のまま返す。
+function trimTransparentRows(src: HTMLCanvasElement): HTMLCanvasElement {
+  const w = src.width;
+  const h = src.height;
+  const ctx = src.getContext("2d");
+  if (!ctx) return src;
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, w, h).data;
+  } catch {
+    return src;
+  }
+  let top = -1;
+  let bottom = -1;
+  for (let y = 0; y < h; y++) {
+    let rowHas = false;
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 8) { rowHas = true; break; }
+    }
+    if (rowHas) {
+      if (top < 0) top = y;
+      bottom = y;
+    }
+  }
+  if (top < 0 || bottom < top) return src;
+  const pad = Math.round(h * 0.01);
+  const y0 = Math.max(0, top - pad);
+  const y1 = Math.min(h - 1, bottom + pad);
+  const outH = y1 - y0 + 1;
+  if (outH >= h) return src; // 余白なし
+  const cropped = document.createElement("canvas");
+  cropped.width = w;
+  cropped.height = outH;
+  const cctx = cropped.getContext("2d");
+  if (!cctx) return src;
+  cctx.drawImage(src, 0, y0, w, outH, 0, 0, w, outH);
+  return cropped;
 }
 
 // 緯度経度の見やすい度分形式（例 "N 36°20.5′"）。
