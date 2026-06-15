@@ -239,6 +239,7 @@ type ExportStyle = {
   labelSubScale: number;
   captionLang: "ja" | "en" | "both" | "none";
   captionLayout: "horizontal" | "vertical";
+  captionTitleMode: "each" | "groupV" | "groupH" | "ja" | "en"; // 日英併記時の見出しのまとめ方
   captionLength: "long" | "short";
   captionBg: BgPanel;
   captionColor: string;
@@ -250,6 +251,9 @@ type ExportStyle = {
   captionSplit: number; // 日英併記(both/horizontal)の境界比
   tagColor: string;
   tagColorTarget: "bg" | "text";
+  capShowElev: boolean; // 標高をタグに出す
+  capShowLoc: boolean; // 場所をタグに出す
+  capSelectedTags: string[]; // 選択中のタグ（山ごとに存在するものだけ反映）
   roleFonts: RoleFonts;
   stampOn: boolean;
   stampStyle: StampStyle;
@@ -279,6 +283,7 @@ const BASE_STYLE: ExportStyle = {
   labelSubScale: 1,
   captionLang: "none",
   captionLayout: "horizontal",
+  captionTitleMode: "each",
   captionLength: "short",
   captionBg: "none",
   captionColor: "#ffffff",
@@ -290,6 +295,9 @@ const BASE_STYLE: ExportStyle = {
   captionSplit: 0.5,
   tagColor: GOLD,
   tagColorTarget: "bg",
+  capShowElev: false,
+  capShowLoc: false,
+  capSelectedTags: [],
   roleFonts: DEFAULT_ROLE_FONTS,
   stampOn: false,
   stampStyle: "contour",
@@ -331,6 +339,8 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
       captionBg: "translucent",
       captionTitleScale: 1.4,
       captionBodyScale: 0.85,
+      captionPos: { u: 0.045, v: 0.712 },
+      captionW: 0.503,
       roleFonts: { labelName: "posterMincho", labelSub: "mincho", captionTitle: "modernGothic", captionBody: "gothic" },
     },
   },
@@ -348,8 +358,11 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
       captionLength: "long",
       captionTitleScale: 1.4,
       captionBodyScale: 0.85,
+      captionPos: { u: 0.061, v: 0.669 },
+      captionW: 0.868,
+      captionSplit: 0.392,
       tagColor: "#ffffff",
-      roleFonts: { labelName: "posterMincho", labelSub: "mincho", captionTitle: "modernGothic", captionBody: "gothic" },
+      roleFonts: { labelName: "posterMincho", labelSub: "mincho", captionTitle: "posterMincho", captionBody: "modernGothic" },
     },
   },
   {
@@ -2860,6 +2873,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setLabelSubScale(s.labelSubScale);
     setCaptionLang(s.captionLang);
     setCaptionLayout(s.captionLayout);
+    setCaptionTitleMode(s.captionTitleMode);
     setCaptionLength(s.captionLength);
     setCaptionBg(s.captionBg);
     setCaptionColor(s.captionColor);
@@ -2871,6 +2885,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setCaptionSplit(s.captionSplit);
     setTagColor(s.tagColor);
     setTagColorTarget(s.tagColorTarget);
+    setCapShowElev(s.capShowElev);
+    setCapShowLoc(s.capShowLoc);
+    setCapSelectedTags(s.capSelectedTags);
     setRoleFonts(s.roleFonts);
     setStampOn(s.stampOn);
     setStampStyle(s.stampStyle);
@@ -2899,6 +2916,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       labelSubScale,
       captionLang,
       captionLayout,
+      captionTitleMode,
       captionLength,
       captionBg,
       captionColor,
@@ -2910,6 +2928,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       captionSplit,
       tagColor,
       tagColorTarget,
+      capShowElev,
+      capShowLoc,
+      capSelectedTags,
       roleFonts,
       stampOn,
       stampStyle,
