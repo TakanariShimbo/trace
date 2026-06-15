@@ -4012,8 +4012,13 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 className={`ar-tpl-card${activeTemplateId === t.id ? " is-active" : ""}`}
                 onClick={() => applyTemplate(t)}
               >
-                <span className="ar-tpl-card-name">{t.name}</span>
-                <span className="ar-tpl-card-hint">{t.hint}</span>
+                <span className="ar-tpl-thumb">
+                  <img src={`/template-previews/${t.id}.jpg`} alt="" loading="lazy" />
+                </span>
+                <span className="ar-tpl-card-body">
+                  <span className="ar-tpl-card-name">{t.name}</span>
+                  <span className="ar-tpl-card-hint">{t.hint}</span>
+                </span>
               </button>
             ))}
             <button
@@ -4021,8 +4026,11 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
               className="ar-tpl-card ar-tpl-card--custom"
               onClick={() => setExportView("edit")}
             >
-              <span className="ar-tpl-card-name">自分で設定</span>
-              <span className="ar-tpl-card-hint">テンプレートを使わず、最初から自分で仕上げる。</span>
+              <span className="ar-tpl-thumb ar-tpl-thumb--custom">自分で</span>
+              <span className="ar-tpl-card-body">
+                <span className="ar-tpl-card-name">自分で設定</span>
+                <span className="ar-tpl-card-hint">テンプレートを使わず、最初から自分で仕上げる。</span>
+              </span>
             </button>
           </div>
           <div className="ar-tpl-foot">
@@ -4954,13 +4962,6 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                   >
                     テンプレート
                   </button>
-                  <button
-                    className="ar-btn-sub"
-                    title="[仮] 現在の設定をJSONで出力（クリップボードにもコピー）"
-                    onClick={dumpCurrentStyle}
-                  >
-                    設定を出力
-                  </button>
                   <button className="ar-btn-main" disabled={arLabels.length === 0} onClick={downloadComposite}>
                     <IconDownload size={15} />
                     ダウンロード
@@ -4991,6 +4992,16 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       {canShare && (
         <button className="share-btn" title="今の場所への共有リンクをコピー" onClick={shareCurrentView}>
           <IconLink size={15} /> {shareCopied ? "コピーしました ✓" : "リンクをコピー"}
+        </button>
+      )}
+      {/* [仮] 現在の設定をJSONで出力（仕上げの編集中のみ。ホームの左隣）。 */}
+      {appMode === "ar" && arStep === "export" && exportView === "edit" && (
+        <button
+          className="dump-btn"
+          title="[仮] 現在の設定をJSONで出力（クリップボードにもコピー）"
+          onClick={dumpCurrentStyle}
+        >
+          設定を出力
         </button>
       )}
       {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
