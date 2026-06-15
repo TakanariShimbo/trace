@@ -245,6 +245,9 @@ type ExportStyle = {
   captionShadow: boolean;
   captionTitleScale: number;
   captionBodyScale: number;
+  captionPos: { u: number; v: number }; // 解説ブロック左上（写真座標）
+  captionW: number; // 解説ブロック幅（フレーム比）
+  captionSplit: number; // 日英併記(both/horizontal)の境界比
   tagColor: string;
   tagColorTarget: "bg" | "text";
   roleFonts: RoleFonts;
@@ -282,6 +285,9 @@ const BASE_STYLE: ExportStyle = {
   captionShadow: true,
   captionTitleScale: 1,
   captionBodyScale: 1,
+  captionPos: { u: 0.05, v: 0.62 },
+  captionW: 0.55,
+  captionSplit: 0.5,
   tagColor: GOLD,
   tagColorTarget: "bg",
   roleFonts: DEFAULT_ROLE_FONTS,
@@ -313,14 +319,14 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "shiori",
     name: "栞",
-    hint: "名札は出さず、選んだ山の解説を主役にした読み物風。",
+    hint: "名札は出さず、選んだ山の解説を英語で添える読み物風。",
     style: {
       ...BASE_STYLE,
       bakeLabels: false,
       labelMode: "jaSubEnElev",
       labelNameScale: 1.2,
       labelSubScale: 0.85,
-      captionLang: "ja",
+      captionLang: "en",
       captionLength: "long",
       captionBg: "translucent",
       captionTitleScale: 1.4,
@@ -2860,6 +2866,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setCaptionShadow(s.captionShadow);
     setCaptionTitleScale(s.captionTitleScale);
     setCaptionBodyScale(s.captionBodyScale);
+    setCaptionPos(s.captionPos);
+    setCaptionW(s.captionW);
+    setCaptionSplit(s.captionSplit);
     setTagColor(s.tagColor);
     setTagColorTarget(s.tagColorTarget);
     setRoleFonts(s.roleFonts);
@@ -2896,6 +2905,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       captionShadow,
       captionTitleScale,
       captionBodyScale,
+      captionPos,
+      captionW,
+      captionSplit,
       tagColor,
       tagColorTarget,
       roleFonts,
