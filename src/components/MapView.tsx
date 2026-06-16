@@ -509,6 +509,35 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   },
 ];
 
+// テンプレを写真の向きに合わせて回す。値は横長を基準に作り、縦長は辺を入れ替える。
+//  間: 長辺に沿って帯を足す（向きは維持）→ 縦長は「左の縦帯」を「上の横帯」へ。
+//  空: 短辺を伸ばす（長辺が入れ替わる）→ 縦長は「上の横帯」を「左の縦帯」へ。
+// 帯の厚みは長辺/短辺の同じ比を保つ。文字位置は帯の中へ寄せた初期値（編集画面で微調整可）。
+const orientStyle = (t: ExportTemplate, portrait: boolean): ExportStyle => {
+  const s = t.style;
+  if (!portrait) return s;
+  if (t.id === "ma") {
+    return {
+      ...s,
+      cropInset: { l: 0, t: s.cropInset.l, r: 0, b: s.cropInset.r }, // 左右クロップ→上下クロップ
+      frameMargin: { t: s.frameMargin.l, r: 0, b: 0, l: 0 }, // 左の縦帯→上の横帯
+      captionLayout: "horizontal", // 縦組み→横組み
+      captionTitleMode: "groupH",
+      captionPos: { u: 0.06, v: -0.3 }, // 上帯の中
+      captionW: 0.86,
+    };
+  }
+  if (t.id === "sora") {
+    return {
+      ...s,
+      frameMargin: { t: 0, r: 0, b: 0, l: s.frameMargin.t }, // 上の横帯→左の縦帯（短辺=横を伸ばす）
+      captionPos: { u: -0.55, v: 0.16 }, // 左帯の中（縦組みのまま）
+      captionW: 0.5,
+    };
+  }
+  return s;
+};
+
 export default function MapView({ appMode, onHome, settings, initialTarget }: MapViewProps) {
   // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
   const arLike = appMode === "ar" || appMode === "live";
@@ -2957,7 +2986,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   };
   // テンプレートの値束を各 state に一括反映し、編集画面へ。
   const applyTemplate = (t: ExportTemplate) => {
-    const s = t.style;
+    // 写真の向き（W/H<1=縦長）で帯の向き・クロップ・文字位置をまとめて切り替える。
+    const ar = arPhotoAspectRef.current ?? (photoNat ? photoNat.w / photoNat.h : 1);
+    const s = orientStyle(t, ar < 1);
     setBakeLabels(s.bakeLabels);
     setLabelMode(s.labelMode);
     setLabelBg(s.labelBg);
