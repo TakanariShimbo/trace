@@ -3935,11 +3935,12 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
             <span className="fade-pill-name">{fadeInfo.name}</span>
           </div>
         )}
-        {/* AR フェーズ移動: ①〜⑤のステップバーで現在を強調＝ウィザード進行と分かる。 */}
+        {/* AR フェーズ移動: ステップバーで現在を強調＝ウィザード進行と分かる。
+            ライブAR(カメラ)は出力が無く①〜④、写真ARは①〜⑤。 */}
         {fadeInfo?.kind === "phase" && (
           <div className="fade-steps">
             <div className="fade-steps-row">
-              {[1, 2, 3, 4, 5].map((n) => (
+              {(appMode === "live" ? [1, 2, 3, 4] : [1, 2, 3, 4, 5]).map((n) => (
                 <span key={n} className={`fade-step${n === fadeInfo.step ? " is-current" : ""}`}>
                   {n}
                 </span>
