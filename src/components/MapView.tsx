@@ -4586,7 +4586,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                         ),
                         content: (
                           <>
-                            {arSec(
+                            {arFlat(
                               "label-common",
                               "共通",
                               <>
@@ -4710,7 +4710,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                         ),
                         content: (
                           <>
-                            {arSec(
+                            {arFlat(
                               "desc-common",
                               "共通",
                               <>
