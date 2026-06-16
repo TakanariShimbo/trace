@@ -531,8 +531,8 @@ const orientStyle = (t: ExportTemplate, portrait: boolean): ExportStyle => {
     return {
       ...s,
       frameMargin: { t: 0, r: 0, b: 0, l: s.frameMargin.t }, // 上の横帯→左の縦帯（短辺=横を伸ばす）
-      captionPos: { u: -0.55, v: 0.16 }, // 左帯の中（縦組みのまま）
-      captionW: 0.5,
+      captionPos: { u: -0.688, v: 0.175 }, // 左帯の中（縦組みのまま）
+      captionW: 0.324,
     };
   }
   return s;
