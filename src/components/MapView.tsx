@@ -475,7 +475,6 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
       roleFonts: { labelName: "posterMincho", labelSub: "mincho", captionTitle: "posterMincho", captionBody: "gothic" },
       frameMargin: { t: 0, r: 0, b: 0, l: 0.39 },
       frameMarginColor: "#c9bc8d",
-      frameMarginAuto: true,
       cropInset: { l: 0.15, t: 0, r: 0.2, b: 0 },
       frameFade: 0.21,
     },
