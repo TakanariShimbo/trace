@@ -327,7 +327,7 @@ type ExportStyle = {
   cropInset: { l: number; t: number; r: number; b: number };
   frameFade: number;
 };
-type ExportTemplate = { id: string; name: string; hint: string; style: ExportStyle };
+type ExportTemplate = { id: string; name: string; sub: string; hint: string; style: ExportStyle };
 
 const GOLD = "#d6b46a";
 const NO_MARGIN = { t: 0, r: 0, b: 0, l: 0 };
@@ -376,6 +376,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "miyabi",
     name: "雅",
+    sub: "定番・山名入り",
     hint: "明朝の山名で上品に。名前・英語名・標高を添える定番。",
     style: {
       ...BASE_STYLE,
@@ -388,6 +389,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "zu",
     name: "図",
+    sub: "ミニマップ入り",
     hint: "名札も解説も出さず、3Dミニマップで位置を添える。",
     style: {
       ...BASE_STYLE,
@@ -412,6 +414,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "shiori",
     name: "栞",
+    sub: "英語解説",
     hint: "名札は出さず、選んだ山の解説を英語で添える読み物風。",
     style: {
       ...BASE_STYLE,
@@ -431,6 +434,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "sou",
     name: "双",
+    sub: "日英併記",
     hint: "日本語と英語を併記。パネルなしで解説を見せる見開き風。",
     style: {
       ...BASE_STYLE,
@@ -452,6 +456,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "ma",
     name: "間",
+    sub: "余白を活かす",
     hint: "左に余白をとり、写真を細く切り出した縦組みの作品。",
     style: {
       ...BASE_STYLE,
@@ -482,6 +487,7 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
     id: "sora",
     name: "空",
+    sub: "縦構図・余白",
     hint: "上に空色の大きな余白をとり、写真へやわらかく溶かす。",
     style: {
       ...BASE_STYLE,
@@ -3824,10 +3830,10 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   );
   // モードのアナウンス（タイトル直下に出す短い案内）。
   const modeHint = showCelestial
-    ? "地図で場所を、「太陽・月」で日時を合わせると、太陽と月の方角・高さ、満ち欠け、日の出・日の入りがわかります。「風景」に切り替えると、空のどこに見えるかを確かめられます。"
+    ? "日時を合わせて、太陽と月の方角・高さを確認します。"
     : isOffline
       ? "保存したい範囲を画面中央に置き、「画面中央を中心地点にする」で中心を決めます。半径と詳細度を選び、「ダウンロード」でこの範囲を端末に保存します。"
-      : "ドラッグで視点を動かし、検索で行きたい場所へ。「風景」に切り替えると、その地に立った目線で山並みを見渡せます。";
+      : "視点を動かして、山並みと見える方向を確認します。";
   // 操作行（地図/カメラ・3D/2D・現在地・撮影地点へ 等）。タブ「操作」の中身に使う。
   // 折りたたみ帯をやめ、タブで1項目だけ表示する。アナウンスはタイトルなし本文のみ。
   const announce = (text: React.ReactNode) => <p className="dock-announce">{text}</p>;
@@ -4176,8 +4182,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         <div className="ar-tpl">
           <div className="ar-tpl-inner">
             <header className="home-head ar-tpl-head">
-              <h1>仕上げのテンプレートを選ぶ</h1>
-              <p>まず雰囲気を選ぶと、文字・色・解説・ミニマップ・余白などが一括で整います。あとから細かく調整できます。</p>
+              <h1>テンプレートを選ぶ</h1>
+              <p>雰囲気を選ぶと、文字・解説・余白をまとめて整えます。あとから細かく調整できます。</p>
             </header>
             <div className="ar-tpl-grid">
               {EXPORT_TEMPLATES.map((t) => (
@@ -4192,7 +4198,10 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     {activeTemplateId === t.id && <span className="ar-tpl-check" aria-hidden="true">✓</span>}
                   </span>
                   <span className="ar-tpl-card-body">
-                    <span className="ar-tpl-card-name">{t.name}</span>
+                    <span className="ar-tpl-card-head">
+                      <span className="ar-tpl-card-name">{t.name}</span>
+                      <span className="ar-tpl-card-sub">{t.sub}</span>
+                    </span>
                     <span className="ar-tpl-card-hint">{t.hint}</span>
                   </span>
                 </button>

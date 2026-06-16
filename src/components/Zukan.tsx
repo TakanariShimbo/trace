@@ -215,6 +215,7 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
           <ZukanOrbit lat={selected.lat} lon={selected.lon} elevationM={selected.elevationM} />
           <p className="zukan-coords">
             <IconLocate size={13} />
+            <span className="zukan-coords-label">位置</span>
             {selected.lat.toFixed(4)}, {selected.lon.toFixed(4)}
           </p>
           {selected.tags.length > 0 && (
@@ -238,14 +239,14 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
             <div className="zukan-desc-block">
               {selected.descriptionJa && (
                 <>
-                  {/* 日英あるときだけ JA/EN を対にして、EN の孤立感をなくす。 */}
-                  {selected.descriptionEn && <p className="zukan-section-label">JA</p>}
+                  {/* 日英あるときだけ見出しを対にして、English の孤立感をなくす。 */}
+                  {selected.descriptionEn && <p className="zukan-section-label">日本語</p>}
                   <p className="zukan-desc">{selected.descriptionJa}</p>
                 </>
               )}
               {selected.descriptionEn && (
                 <>
-                  <p className="zukan-section-label">EN</p>
+                  <p className="zukan-section-label">English</p>
                   <p className="zukan-desc zukan-desc--en">{selected.descriptionEn}</p>
                 </>
               )}
@@ -353,13 +354,9 @@ export default function Zukan({ onHome, onOpenMap }: Props) {
                 </span>
                 <span className="zukan-card-body">
                   <span className="zukan-card-name">{e.name}</span>
-                  {(e.kana || e.titleEn) && (
-                    <span className="zukan-card-reading">
-                      {e.kana}
-                      {e.kana && e.titleEn && " / "}
-                      {e.titleEn && <span className="zukan-card-en">{e.titleEn}</span>}
-                    </span>
-                  )}
+                  {/* 読み（日本語）と英名は行を分ける。英名は小さめ・薄めで、切れても雑に見えにくく。 */}
+                  {e.kana && <span className="zukan-card-reading">{e.kana}</span>}
+                  {e.titleEn && <span className="zukan-card-en">{e.titleEn}</span>}
                   {/* 一覧は「読まずに選ぶ」。場所＋タグを補助情報として控えめに横並び。 */}
                   <span className="zukan-card-meta">
                     {e.prefecture && <span className="zukan-card-pref">{e.prefecture.replace(/\//g, "・")}</span>}
