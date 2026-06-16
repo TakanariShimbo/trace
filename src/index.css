@@ -8,6 +8,27 @@
   font-family: var(--font-body);
   /* パネル内ボタンの共通高さ。すべての操作ボタンはこの高さに揃える（幅は中身次第）。 */
   --btn-h: 36px;
+
+  /* 画面共通のデザイントークン（入口/探す/作業でルールを揃える土台）。
+     値は既存の見た目に合わせており、今後はこのトークンを参照して統一していく。 */
+  --bg: #0a0d12;
+  --surface: rgba(20, 27, 38, 0.82); /* カード地（黒に近い青黒） */
+  --surface-solid: #10151b;
+  --surface-soft: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.1); /* 標準枠線（薄い白） */
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-main: rgba(255, 255, 255, 0.92);
+  --text-sub: rgba(255, 255, 255, 0.62);
+  --text-muted: rgba(255, 255, 255, 0.42);
+  --accent: #d6b46a; /* くすんだ金。選択中／メインボタン／重要 のみに使う */
+  --accent-soft: rgba(214, 180, 106, 0.18);
+  --radius-card: 14px;
+  --radius-panel: 18px;
+  --radius-control: 10px;
+  /* 画面タイプ別の上余白。入口=広い / 探す=中 / 作業=最小（コンテンツを上から見せる）。 */
+  --top-entry: clamp(40px, 8vh, 88px);
+  --top-browse: clamp(28px, 5vh, 40px);
+  --top-work: 0px;
 }
 
 * {
@@ -1922,7 +1943,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding: clamp(36px, 7vh, 64px) 0 56px;
+  padding: var(--top-browse) 0 56px; /* 探す画面の上余白を図鑑と共通化 */
 }
 /* 見出しは home-head を再利用。長いタイトルなので図鑑より一段控えめなサイズに。 */
 .ar-tpl-head.home-head h1 {
@@ -2695,7 +2716,7 @@ details.ar-sec {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding-top: 34px;
+  padding-top: var(--top-browse); /* 探す画面の上余白（中くらい）を共通化 */
   padding-bottom: 0;
 }
 /* 末尾の下余白。.home は overflow付き flex コンテナで、子の padding-bottom は
