@@ -1840,18 +1840,23 @@ body,
   gap: 8px;
 }
 /* 仕上げのテンプレート選択（export に入った直後の入口画面）。 */
+/* テンプレ選択。ホーム/図鑑と同じ“黒地＋くすんだ金1色”の静かな質感に揃える。 */
 .ar-tpl {
   position: absolute;
   inset: 0;
   z-index: 23;
-  background: #06080c;
+  /* ホームと同じ、上からほのかに金が差す近黒の背景（緑や山の質感は足さない）。 */
+  background:
+    radial-gradient(1100px 620px at 50% -6%, rgba(214, 180, 106, 0.07), transparent 70%),
+    #0b0c0e;
+  color: #f5f2ea;
   display: flex;
   flex-direction: column;
   align-items: center;
   /* safe: 内容が画面より高いときは中央寄せをやめて上端から並べる（上部のタイトル見切れ防止）。 */
   justify-content: safe center;
-  gap: 22px;
-  padding: 32px 24px;
+  gap: 26px;
+  padding: 40px 28px;
   overflow-y: auto;
 }
 .ar-tpl-head {
@@ -1859,21 +1864,22 @@ body,
   max-width: 560px;
 }
 .ar-tpl-title {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0 0 10px;
+  font-size: 23px;
   font-weight: 700;
-  color: #f3eedf;
+  letter-spacing: 0.01em;
+  color: #f5f2ea;
 }
 .ar-tpl-sub {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
-  color: rgba(214, 224, 236, 0.7);
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #9c9a94;
 }
 .ar-tpl-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(150px, 1fr));
-  gap: 12px;
+  gap: 14px;
   width: 100%;
   max-width: 720px;
 }
@@ -1883,36 +1889,39 @@ body,
   text-align: left;
   padding: 0;
   overflow: hidden;
-  background: rgba(28, 36, 48, 0.85);
+  background: rgba(20, 27, 38, 0.8);
   border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, transform 0.06s;
+  transition: border-color 0.12s ease, background 0.12s ease, transform 0.12s ease;
 }
 .ar-tpl-card:hover {
-  background: rgba(40, 50, 66, 0.95);
-  border-color: rgba(214, 180, 106, 0.6);
+  transform: translateY(-3px);
+  background: rgba(28, 38, 54, 0.9);
+  border-color: rgba(214, 180, 106, 0.45);
 }
 .ar-tpl-card:active {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
+/* 選択中だけ控えめな金枠（チェックは右上に小さく）。強い影や太枠は使わない。 */
 .ar-tpl-card.is-active {
-  border-color: #d6b46a;
-  box-shadow: 0 0 0 1px rgba(214, 180, 106, 0.5) inset;
+  border-color: rgba(214, 180, 106, 0.75);
+  box-shadow: 0 0 0 1px rgba(214, 180, 106, 0.22);
 }
 .ar-tpl-card--custom {
-  background: rgba(20, 26, 36, 0.7);
+  background: rgba(255, 255, 255, 0.03);
   border-style: dashed;
 }
 /* プレビュー画像（テンプレごとの完成見本）。実際の出力比率のまま contain で見せる。 */
 .ar-tpl-thumb {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   aspect-ratio: 3 / 2;
-  background: #06080c;
-  border-bottom: 1px solid rgba(130, 150, 175, 0.18);
+  background: #0c0d10;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 .ar-tpl-thumb img {
@@ -1921,9 +1930,26 @@ body,
   object-fit: contain;
   display: block;
 }
+/* 選択中バッジ。右上に小さく、金地に黒チェック（図鑑の順位バッジと同じ作法）。 */
+.ar-tpl-check {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0b0f12;
+  background: rgba(214, 180, 106, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
 .ar-tpl-thumb--custom {
   font-size: 13px;
-  color: rgba(214, 224, 236, 0.5);
+  color: rgba(245, 242, 234, 0.5);
   background: repeating-linear-gradient(
     -45deg,
     rgba(130, 150, 175, 0.06),
@@ -1935,18 +1961,19 @@ body,
 .ar-tpl-card-body {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 14px 12px;
+  gap: 5px;
+  padding: 12px 15px 14px;
 }
 .ar-tpl-card-name {
   font-size: 15px;
   font-weight: 700;
-  color: #f3eedf;
+  letter-spacing: -0.01em;
+  color: #f5f2ea;
 }
 .ar-tpl-card-hint {
   font-size: 12px;
-  line-height: 1.5;
-  color: rgba(214, 224, 236, 0.62);
+  line-height: 1.55;
+  color: rgba(242, 240, 234, 0.55);
 }
 .ar-tpl-foot {
   display: flex;

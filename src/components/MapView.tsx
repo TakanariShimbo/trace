@@ -4175,6 +4175,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
               >
                 <span className="ar-tpl-thumb">
                   <img src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`} alt="" loading="lazy" />
+                  {activeTemplateId === t.id && <span className="ar-tpl-check" aria-hidden="true">✓</span>}
                 </span>
                 <span className="ar-tpl-card-body">
                   <span className="ar-tpl-card-name">{t.name}</span>
