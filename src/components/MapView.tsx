@@ -4170,42 +4170,44 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
           パネルは①〜④と同じ統一シェル（グリップ＝ステップ＋折り畳み、本体＝ヒント＋操作）。 */}
       {appMode === "ar" && arStep === "export" && exportView === "template" && (
         <div className="ar-tpl">
-          <div className="ar-tpl-head">
-            <h2 className="ar-tpl-title">仕上げのテンプレートを選ぶ</h2>
-            <p className="ar-tpl-sub">まず雰囲気を選ぶと、文字・色・解説・ミニマップ・余白などが一括で整います。あとから細かく調整できます。</p>
-          </div>
-          <div className="ar-tpl-grid">
-            {EXPORT_TEMPLATES.map((t) => (
+          <div className="ar-tpl-inner">
+            <header className="home-head ar-tpl-head">
+              <h1>仕上げのテンプレートを選ぶ</h1>
+              <p>まず雰囲気を選ぶと、文字・色・解説・ミニマップ・余白などが一括で整います。あとから細かく調整できます。</p>
+            </header>
+            <div className="ar-tpl-grid">
+              {EXPORT_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className={`ar-tpl-card${activeTemplateId === t.id ? " is-active" : ""}`}
+                  onClick={() => applyTemplate(t)}
+                >
+                  <span className="ar-tpl-thumb">
+                    <img src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`} alt="" loading="lazy" />
+                    {activeTemplateId === t.id && <span className="ar-tpl-check" aria-hidden="true">✓</span>}
+                  </span>
+                  <span className="ar-tpl-card-body">
+                    <span className="ar-tpl-card-name">{t.name}</span>
+                    <span className="ar-tpl-card-hint">{t.hint}</span>
+                  </span>
+                </button>
+              ))}
               <button
-                key={t.id}
                 type="button"
-                className={`ar-tpl-card${activeTemplateId === t.id ? " is-active" : ""}`}
-                onClick={() => applyTemplate(t)}
+                className="ar-tpl-card ar-tpl-card--custom"
+                onClick={() => setExportView("edit")}
               >
-                <span className="ar-tpl-thumb">
-                  <img src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`} alt="" loading="lazy" />
-                  {activeTemplateId === t.id && <span className="ar-tpl-check" aria-hidden="true">✓</span>}
-                </span>
+                <span className="ar-tpl-thumb ar-tpl-thumb--custom">自分で</span>
                 <span className="ar-tpl-card-body">
-                  <span className="ar-tpl-card-name">{t.name}</span>
-                  <span className="ar-tpl-card-hint">{t.hint}</span>
+                  <span className="ar-tpl-card-name">自分で設定</span>
+                  <span className="ar-tpl-card-hint">テンプレートを使わず、最初から自分で仕上げる。</span>
                 </span>
               </button>
-            ))}
-            <button
-              type="button"
-              className="ar-tpl-card ar-tpl-card--custom"
-              onClick={() => setExportView("edit")}
-            >
-              <span className="ar-tpl-thumb ar-tpl-thumb--custom">自分で</span>
-              <span className="ar-tpl-card-body">
-                <span className="ar-tpl-card-name">自分で設定</span>
-                <span className="ar-tpl-card-hint">テンプレートを使わず、最初から自分で仕上げる。</span>
-              </span>
-            </button>
-          </div>
-          <div className="ar-tpl-foot">
-            <button className="ar-btn-sub" onClick={backToAlignFromExport}>微調整へ戻る</button>
+            </div>
+            <div className="ar-tpl-foot">
+              <button className="ar-btn-sub" onClick={backToAlignFromExport}>微調整へ戻る</button>
+            </div>
           </div>
         </div>
       )}
