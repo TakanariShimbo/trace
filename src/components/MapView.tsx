@@ -523,8 +523,9 @@ const orientStyle = (t: ExportTemplate, portrait: boolean): ExportStyle => {
       frameMargin: { t: s.frameMargin.l, r: 0, b: 0, l: 0 }, // 左の縦帯→上の横帯
       captionLayout: "horizontal", // 縦組み→横組み
       captionTitleMode: "groupH",
-      captionPos: { u: 0.06, v: -0.3 }, // 上帯の中
+      captionPos: { u: 0.073, v: -0.07 }, // 上帯の中
       captionW: 0.86,
+      captionSplit: 0.421,
     };
   }
   if (t.id === "sora") {
