@@ -4174,7 +4174,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 onClick={() => applyTemplate(t)}
               >
                 <span className="ar-tpl-thumb">
-                  <img src={`/template-previews/${t.id}.jpg`} alt="" loading="lazy" />
+                  <img src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`} alt="" loading="lazy" />
                 </span>
                 <span className="ar-tpl-card-body">
                   <span className="ar-tpl-card-name">{t.name}</span>
