@@ -4571,7 +4571,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 <div className="cam-hud-body">
                 {announce(
                   arLabels.length > 0
-                    ? `「編集」で名札と解説をドラッグして配置、「画像」で写真の位置と大きさを調整します（切り替えで誤操作を防げます）。下のタブで文字・色・切り抜き・余白も仕上げられます。山名 ${arLabels.length}件。`
+                    ? `「編集」で名札を配置、「画像」で写真を調整。下のタブで文字・色・余白も仕上げられます。山名 ${arLabels.length}件。`
                     : "枠の中に山が入っていません。ひとつ戻って、向きや画角を合わせ直してください。",
                 )}
                 {/* ラベル・解説・操作（編集/画像＋ズーム）をタブで1つだけ表示。ARは操作を末尾に。 */}
@@ -5060,7 +5060,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     id: "crop",
                     label: (
                       <>
-                        <IconImage size={13} /> 切抜
+                        <IconImage size={13} /> 切り抜き
                       </>
                     ),
                     content: (
@@ -5222,10 +5222,10 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       {appMode === "ar" && arStep === "export" && exportView === "edit" && (
         <button
           className="dump-btn"
-          title="[仮] 現在の設定をJSONで出力（クリップボードにもコピー）"
+          title="[開発用] 現在の設定をJSONで出力（クリップボードにもコピー）"
           onClick={dumpCurrentStyle}
         >
-          設定を出力
+          JSON出力
         </button>
       )}
       {/* ホームへ戻る（右上の右端。押し間違い防止で左の操作群と離す）。 */}
