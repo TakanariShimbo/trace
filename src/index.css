@@ -1839,6 +1839,64 @@ body,
   justify-content: flex-end;
   gap: 8px;
 }
+/* 書き出しプレビュー（焼き込んだ合成画像を確認 → 保存するか選ぶ）。 */
+.ar-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(4, 6, 10, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.ar-preview-card {
+  width: min(720px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  background: #0e141d;
+  border: 1px solid rgba(130, 150, 175, 0.3);
+  border-radius: 14px;
+}
+.ar-preview-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #f5f2ea;
+}
+.ar-preview-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(242, 240, 234, 0.6);
+}
+/* 画像は枠内に収める（縦横どちらの作品でも全体が見えるよう contain）。 */
+.ar-preview-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #06080c;
+  border: 1px solid rgba(130, 150, 175, 0.2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ar-preview-body img {
+  max-width: 100%;
+  max-height: 64vh;
+  object-fit: contain;
+  display: block;
+}
+.ar-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 /* 仕上げのテンプレート選択（export に入った直後の入口画面）。 */
 /* テンプレ選択。ホーム/図鑑と同じ“黒地＋くすんだ金1色”の静かな質感に揃える。 */
 .ar-tpl {
