@@ -8,6 +8,27 @@
   font-family: var(--font-body);
   /* パネル内ボタンの共通高さ。すべての操作ボタンはこの高さに揃える（幅は中身次第）。 */
   --btn-h: 36px;
+
+  /* 画面共通のデザイントークン（入口/探す/作業でルールを揃える土台）。
+     値は既存の見た目に合わせており、今後はこのトークンを参照して統一していく。 */
+  --bg: #0a0d12;
+  --surface: rgba(20, 27, 38, 0.82); /* カード地（黒に近い青黒） */
+  --surface-solid: #10151b;
+  --surface-soft: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.1); /* 標準枠線（薄い白） */
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text-main: rgba(255, 255, 255, 0.92);
+  --text-sub: rgba(255, 255, 255, 0.62);
+  --text-muted: rgba(255, 255, 255, 0.42);
+  --accent: #d6b46a; /* くすんだ金。選択中／メインボタン／重要 のみに使う */
+  --accent-soft: rgba(214, 180, 106, 0.18);
+  --radius-card: 14px;
+  --radius-panel: 18px;
+  --radius-control: 10px;
+  /* 画面タイプ別の上余白。入口=広い / 探す=中 / 作業=最小（コンテンツを上から見せる）。 */
+  --top-entry: clamp(40px, 8vh, 88px);
+  --top-browse: clamp(28px, 5vh, 40px);
+  --top-work: 0px;
 }
 
 * {
@@ -1376,13 +1397,13 @@ body,
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 18px;
-  padding: 16px 18px;
+  gap: 14px;
+  padding: 13px 16px;
   text-align: left;
   color: #e6edf5;
   background: rgba(20, 27, 38, 0.8);
   border: 1px solid rgba(130, 150, 175, 0.28);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   cursor: pointer;
   transition:
     transform 0.12s ease,
@@ -1399,11 +1420,11 @@ body,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-control);
   color: #ece3cf;
-  background: rgba(214, 180, 106, 0.2);
+  background: var(--accent-soft);
 }
 .home-card-text {
   display: flex;
@@ -1620,6 +1641,7 @@ body,
   padding: 0 12px;
   justify-content: center;
 }
+/* 未完了ステップは弱める＝「今どこにいるか」を相対的に強調。 */
 .ar-step {
   display: inline-flex;
   align-items: center;
@@ -1627,6 +1649,7 @@ body,
   font-size: 12px;
   white-space: nowrap;
   color: #8294aa;
+  opacity: 0.45;
 }
 .ar-step b {
   display: inline-flex;
@@ -1639,15 +1662,20 @@ body,
   background: rgba(130, 150, 175, 0.25);
   color: #cdd6e2;
 }
+/* 現在ステップは名前を太く・明るく、丸は金で前に出す。 */
 .ar-step.is-active {
-  color: #f3ead2;
+  color: var(--text-main);
+  opacity: 1;
+  font-weight: 700;
 }
 .ar-step.is-active b {
-  background: #d6b46a;
+  background: var(--accent);
   color: #1a1206;
 }
+/* 完了ステップは未完了より少し強め（完了 > これから が分かるように）。 */
 .ar-step.is-done {
   color: #9fb0c4;
+  opacity: 0.75;
 }
 .ar-step.is-done b {
   background: rgba(255, 255, 255, 0.18);
@@ -1922,7 +1950,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding: clamp(36px, 7vh, 64px) 0 56px;
+  padding: var(--top-browse) 0 56px; /* 探す画面の上余白を図鑑と共通化 */
 }
 /* 見出しは home-head を再利用。長いタイトルなので図鑑より一段控えめなサイズに。 */
 .ar-tpl-head.home-head h1 {
@@ -2021,11 +2049,22 @@ body,
   gap: 6px;
   padding: 14px 16px 16px;
 }
+/* 漢字1文字の名前＋補助名（機能がひと目で分かる短いラベル）をベースライン揃えで横並び。 */
+.ar-tpl-card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
 .ar-tpl-card-name {
   font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--fg);
+}
+.ar-tpl-card-sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sub);
 }
 .ar-tpl-card-hint {
   font-size: 12px;
@@ -2684,7 +2723,7 @@ details.ar-sec {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  padding-top: 34px;
+  padding-top: var(--top-browse); /* 探す画面の上余白（中くらい）を共通化 */
   padding-bottom: 0;
 }
 /* 末尾の下余白。.home は overflow付き flex コンテナで、子の padding-bottom は
@@ -2731,17 +2770,22 @@ details.ar-sec {
   flex-wrap: wrap;
   gap: 8px;
 }
+/* 一覧の主役は検索。絞り込みは補助なので、検索欄より一段小さく・控えめに。 */
 .zukan-filters select {
   flex: 1 1 auto;
   min-width: 0;
-  height: 36px;
-  padding: 0 14px;
-  color: var(--fg);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  height: 32px;
+  padding: 0 12px;
+  color: var(--text-sub);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 12px;
   cursor: pointer;
+}
+.zukan-filters select:hover {
+  color: var(--text-main);
+  border-color: var(--border-strong);
 }
 .zukan-count {
   margin: 2px 0 0; /* 絞り込み下に右寄せで控えめに */
@@ -2876,8 +2920,13 @@ details.ar-sec {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 英名は読みの下に独立した1行。小さめ・薄めで、長くて切れても雑に見えにくく。 */
 .zukan-card-en {
-  opacity: 0.82;
+  font-size: 11.5px;
+  color: rgba(242, 240, 234, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* 場所＋タグを補助情報として控えめに横並び。 */
 .zukan-card-meta {
@@ -3091,6 +3140,13 @@ details.ar-sec {
 }
 .zukan-coords svg {
   opacity: 0.7;
+}
+/* 「位置」のラベル。座標は Mono だが、和文ラベルは通常フォントで控えめに前置き。 */
+.zukan-coords-label {
+  font-family: system-ui, "Noto Sans JP", sans-serif;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.34);
+  margin-right: 2px;
 }
 .zukan-tags {
   display: flex;
