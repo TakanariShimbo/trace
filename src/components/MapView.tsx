@@ -166,6 +166,65 @@ const hexToRgb = (hex: string): string => {
   const b = parseInt(m.slice(4, 6), 16) || 0;
   return `${r},${g},${b}`;
 };
+// 余白の色を写真の縁から動的に決める。余白のある辺に隣り合う写真端の細い帯を平均し、hex を返す。
+// 夕焼けなら橙寄り・青空なら水色寄りになり、余白が写真へ自然に溶ける（「空」「間」テンプレ向け）。
+const samplePhotoEdgeColor = async (
+  url: string,
+  crop: { l: number; t: number; r: number; b: number },
+  margin: { t: number; r: number; b: number; l: number },
+): Promise<string | null> => {
+  const img = new Image();
+  img.src = url;
+  try {
+    await img.decode();
+  } catch {
+    return null;
+  }
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (!W || !H) return null;
+  // 切り抜き後の写真領域（元写真ピクセル）。余白は切り抜き後の辺に接するので、この矩形の端を見る。
+  const cl = crop.l * W, ct = crop.t * H;
+  const cw = Math.max(1, W * (1 - crop.l - crop.r));
+  const ch = Math.max(1, H * (1 - crop.t - crop.b));
+  // 縮小して描き、端の細い帯を平均する。負荷を抑えるため最大辺を 256px に。
+  const scale = Math.min(1, 256 / Math.max(cw, ch));
+  const sw = Math.max(1, Math.round(cw * scale));
+  const sh = Math.max(1, Math.round(ch * scale));
+  const cv = document.createElement("canvas");
+  cv.width = sw;
+  cv.height = sh;
+  const ctx = cv.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(img, cl, ct, cw, ch, 0, 0, sw, sh);
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, sw, sh).data;
+  } catch {
+    return null; // クロスオリジン等で読めない場合は据え置き
+  }
+  // 端から内側へ取り込む帯の厚み（辺長の ~8%、最低 1px）。
+  const band = (n: number) => Math.max(1, Math.round(n * 0.08));
+  let r = 0, g = 0, b = 0, n = 0;
+  const add = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
+        const i = (y * sw + x) * 4;
+        r += data[i];
+        g += data[i + 1];
+        b += data[i + 2];
+        n++;
+      }
+  };
+  // 余白のある辺に隣接する帯だけを平均する。どの辺も余白0なら（既定）上端を見る。
+  const any = margin.t > 0 || margin.b > 0 || margin.l > 0 || margin.r > 0;
+  if (!any || margin.t > 0) add(0, 0, sw, band(sh));
+  if (margin.b > 0) add(0, sh - band(sh), sw, sh);
+  if (margin.l > 0) add(0, 0, band(sw), sh);
+  if (margin.r > 0) add(sw - band(sw), 0, sw, sh);
+  if (!n) return null;
+  const hx = (v: number) => Math.round(v / n).toString(16).padStart(2, "0");
+  return `#${hx(r)}${hx(g)}${hx(b)}`;
+};
 // 文字色が暗色か（相対輝度<0.5）。影・パネル・タグの反対色を決めるのに使う。
 const isDarkColor = (hex: string): boolean => {
   const [r, g, b] = hexToRgb(hex).split(",").map(Number);
@@ -264,6 +323,7 @@ type ExportStyle = {
   stampPos: { u: number; v: number };
   frameMargin: { t: number; r: number; b: number; l: number };
   frameMarginColor: string;
+  frameMarginAuto: boolean; // 余白の色を写真の縁から動的に決める（夕焼け等に合わせる）
   cropInset: { l: number; t: number; r: number; b: number };
   frameFade: number;
 };
@@ -308,6 +368,7 @@ const BASE_STYLE: ExportStyle = {
   stampPos: { u: 0.62, v: 0.6 },
   frameMargin: NO_MARGIN,
   frameMarginColor: "#ffffff",
+  frameMarginAuto: false,
   cropInset: NO_CROP,
   frameFade: 0,
 };
@@ -442,10 +503,40 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
       roleFonts: { labelName: "posterMincho", labelSub: "mincho", captionTitle: "posterMincho", captionBody: "gothic" },
       frameMargin: { t: 0.8, r: 0, b: 0, l: 0 },
       frameMarginColor: "#749acc",
+      frameMarginAuto: true,
       frameFade: 0.26,
     },
   },
 ];
+
+// テンプレを写真の向きに合わせて回す。値は横長を基準に作り、縦長は辺を入れ替える。
+//  間: 長辺に沿って帯を足す（向きは維持）→ 縦長は「左の縦帯」を「上の横帯」へ。
+//  空: 短辺を伸ばす（長辺が入れ替わる）→ 縦長は「上の横帯」を「左の縦帯」へ。
+// 帯の厚みは長辺/短辺の同じ比を保つ。文字位置は帯の中へ寄せた初期値（編集画面で微調整可）。
+const orientStyle = (t: ExportTemplate, portrait: boolean): ExportStyle => {
+  const s = t.style;
+  if (!portrait) return s;
+  if (t.id === "ma") {
+    return {
+      ...s,
+      cropInset: { l: 0, t: s.cropInset.l, r: 0, b: s.cropInset.r }, // 左右クロップ→上下クロップ
+      frameMargin: { t: s.frameMargin.l, r: 0, b: 0, l: 0 }, // 左の縦帯→上の横帯
+      captionLayout: "horizontal", // 縦組み→横組み
+      captionTitleMode: "groupH",
+      captionPos: { u: 0.06, v: -0.3 }, // 上帯の中
+      captionW: 0.86,
+    };
+  }
+  if (t.id === "sora") {
+    return {
+      ...s,
+      frameMargin: { t: 0, r: 0, b: 0, l: s.frameMargin.t }, // 上の横帯→左の縦帯（短辺=横を伸ばす）
+      captionPos: { u: -0.55, v: 0.16 }, // 左帯の中（縦組みのまま）
+      captionW: 0.5,
+    };
+  }
+  return s;
+};
 
 export default function MapView({ appMode, onHome, settings, initialTarget }: MapViewProps) {
   // ar(写真)と live(カメラ) は、地点→向き→山選択→微調整 の流れを共有する（データ源だけ違う）。
@@ -741,6 +832,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [cropInset, setCropInset] = useState({ l: 0, t: 0, r: 0, b: 0 }); // 写真の各辺を内側へ切り抜く割合
   const [frameMargin, setFrameMargin] = useState({ t: 0, r: 0, b: 0, l: 0 }); // 余白（切り抜き後の辺長に対する割合）
   const [frameMarginColor, setFrameMarginColor] = useState("#ffffff"); // 余白の色（白/黒）
+  const [frameMarginAuto, setFrameMarginAuto] = useState(false); // 余白の色を写真の縁から動的に決める
   const [frameFade, setFrameFade] = useState(0); // ふち：余白のある辺で写真を余白色へぼかす幅（切り抜き後の辺長に対する割合）
   // 3Dミニマップ・スタンプ（写真ARの仕上げで写真の隅に焼き込む）。既定はオフ。
   const [stampOn, setStampOn] = useState(false);
@@ -832,6 +924,31 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     if (dir === "l") return { ...base, top: 0, bottom: 0, left: 0, width: pct, background: grad("to right") };
     return { ...base, top: 0, bottom: 0, right: 0, width: pct, background: grad("to left") };
   };
+  // 余白の色を写真に合わせる（auto）。余白のある辺の写真端を平均して余白色に反映する。
+  // 写真・切り抜き・余白が変わるたびに採り直すので、調整に追従して色がなじむ。
+  useEffect(() => {
+    if (!frameMarginAuto || !photoUrl) return;
+    let cancelled = false;
+    samplePhotoEdgeColor(photoUrl, cropInset, frameMargin).then((c) => {
+      if (!cancelled && c) setFrameMarginColor(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // 余白/切り抜きは辺ごとの数値で依存させる（オブジェクト参照だと毎描画で再実行になるため）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    frameMarginAuto,
+    photoUrl,
+    cropInset.l,
+    cropInset.t,
+    cropInset.r,
+    cropInset.b,
+    frameMargin.t,
+    frameMargin.b,
+    frameMargin.l,
+    frameMargin.r,
+  ]);
   const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" | "stamp" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
@@ -2869,7 +2986,9 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   };
   // テンプレートの値束を各 state に一括反映し、編集画面へ。
   const applyTemplate = (t: ExportTemplate) => {
-    const s = t.style;
+    // 写真の向き（W/H<1=縦長）で帯の向き・クロップ・文字位置をまとめて切り替える。
+    const ar = arPhotoAspectRef.current ?? (photoNat ? photoNat.w / photoNat.h : 1);
+    const s = orientStyle(t, ar < 1);
     setBakeLabels(s.bakeLabels);
     setLabelMode(s.labelMode);
     setLabelBg(s.labelBg);
@@ -2903,7 +3022,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setStampOrient(s.stampOrient);
     setStampPos(s.stampPos);
     setFrameMargin(s.frameMargin);
-    setFrameMarginColor(s.frameMarginColor);
+    setFrameMarginColor(s.frameMarginColor); // auto の写真サンプルが済むまでの既定色
+    setFrameMarginAuto(s.frameMarginAuto);
     setCropInset(s.cropInset);
     setFrameFade(s.frameFade);
     setActiveTemplateId(t.id);
@@ -2947,6 +3067,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       stampPos,
       frameMargin,
       frameMarginColor,
+      frameMarginAuto,
       cropInset,
       frameFade,
     };
@@ -4926,13 +5047,26 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     ),
                     content: (
                       <>
+                        <label className="switch-row">
+                          <span>写真に合わせる</span>
+                          <input
+                            type="checkbox"
+                            className="switch"
+                            checked={frameMarginAuto}
+                            onChange={(e) => setFrameMarginAuto(e.target.checked)}
+                          />
+                        </label>
                         <div className="ar-fs-row">
                           <span>余白の色</span>
                           <input
                             type="color"
                             className="ar-color-input"
                             value={frameMarginColor}
-                            onChange={(e) => setFrameMarginColor(e.target.value)}
+                            disabled={frameMarginAuto}
+                            onChange={(e) => {
+                              setFrameMarginAuto(false); // 手で選んだら自動を解除
+                              setFrameMarginColor(e.target.value);
+                            }}
                             aria-label="余白の色"
                           />
                         </div>
