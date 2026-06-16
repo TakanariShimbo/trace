@@ -1898,8 +1898,12 @@ body,
   gap: 8px;
 }
 /* 仕上げのテンプレート選択（export に入った直後の入口画面）。 */
-/* テンプレ選択。ホーム/図鑑と同じ“黒地＋くすんだ金1色”の静かな質感に揃える。 */
+/* テンプレ選択。図鑑の一覧ビューと同じ作法（中央1カラム＋home-headの大見出し）に揃える。 */
 .ar-tpl {
+  /* 図鑑/ホームと同じパレット（home-head・カードの var 参照を解決させる）。 */
+  --fg: #f5f2ea;
+  --sub: #9c9a94;
+  --accent: #d6b46a;
   position: absolute;
   inset: 0;
   z-index: 23;
@@ -1907,39 +1911,34 @@ body,
   background:
     radial-gradient(1100px 620px at 50% -6%, rgba(214, 180, 106, 0.07), transparent 70%),
     #0b0c0e;
-  color: #f5f2ea;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* safe: 内容が画面より高いときは中央寄せをやめて上端から並べる（上部のタイトル見切れ防止）。 */
-  justify-content: safe center;
-  gap: 26px;
-  padding: 40px 28px;
+  color: var(--fg);
+  padding: 0 24px;
   overflow-y: auto;
 }
-.ar-tpl-head {
-  text-align: center;
-  max-width: 560px;
+/* 図鑑の .zukan-inner と同じ中央寄せの縦カラム。 */
+.ar-tpl-inner {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: clamp(36px, 7vh, 64px) 0 56px;
 }
-.ar-tpl-title {
-  margin: 0 0 10px;
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  color: #f5f2ea;
+/* 見出しは home-head を再利用。長いタイトルなので図鑑より一段控えめなサイズに。 */
+.ar-tpl-head.home-head h1 {
+  font-size: clamp(27px, 5vw, 40px);
+  letter-spacing: -0.005em;
 }
-.ar-tpl-sub {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: #9c9a94;
+.ar-tpl-head.home-head p {
+  max-width: 540px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .ar-tpl-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(150px, 1fr));
-  gap: 14px;
+  gap: 16px;
   width: 100%;
-  max-width: 720px;
 }
 .ar-tpl-card {
   display: flex;
@@ -2019,23 +2018,24 @@ body,
 .ar-tpl-card-body {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 12px 15px 14px;
+  gap: 6px;
+  padding: 14px 16px 16px;
 }
 .ar-tpl-card-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #f5f2ea;
+  color: var(--fg);
 }
 .ar-tpl-card-hint {
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: rgba(242, 240, 234, 0.55);
 }
 .ar-tpl-foot {
   display: flex;
   justify-content: center;
+  margin-top: 4px;
 }
 @media (max-width: 560px) {
   .ar-tpl-grid {
