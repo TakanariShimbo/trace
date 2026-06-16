@@ -1641,6 +1641,7 @@ body,
   padding: 0 12px;
   justify-content: center;
 }
+/* 未完了ステップは弱める＝「今どこにいるか」を相対的に強調。 */
 .ar-step {
   display: inline-flex;
   align-items: center;
@@ -1648,6 +1649,7 @@ body,
   font-size: 12px;
   white-space: nowrap;
   color: #8294aa;
+  opacity: 0.45;
 }
 .ar-step b {
   display: inline-flex;
@@ -1660,15 +1662,20 @@ body,
   background: rgba(130, 150, 175, 0.25);
   color: #cdd6e2;
 }
+/* 現在ステップは名前を太く・明るく、丸は金で前に出す。 */
 .ar-step.is-active {
-  color: #f3ead2;
+  color: var(--text-main);
+  opacity: 1;
+  font-weight: 700;
 }
 .ar-step.is-active b {
-  background: #d6b46a;
+  background: var(--accent);
   color: #1a1206;
 }
+/* 完了ステップは未完了より少し強め（完了 > これから が分かるように）。 */
 .ar-step.is-done {
   color: #9fb0c4;
+  opacity: 0.75;
 }
 .ar-step.is-done b {
   background: rgba(255, 255, 255, 0.18);
