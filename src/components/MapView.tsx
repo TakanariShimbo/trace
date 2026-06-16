@@ -847,6 +847,8 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [exportView, setExportView] = useState<"template" | "edit">("template");
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null); // 適用中テンプレ（いじると custom=null）
   const [styleDump, setStyleDump] = useState<string | null>(null); // [仮] 現在の設定を JSON 出力するためのテキスト
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null); // 書き出しプレビュー（焼き込んだ合成画像のdataURL）
+  const [previewBaking, setPreviewBaking] = useState(false); // プレビュー生成中（ダウンロード押下→焼き込み中）
   // プレビュー用のスタンプ画像（PNG dataURL）と山情報。書き出しは bakeComposite で都度再生成。
   const [stampPreview, setStampPreview] = useState<{
     url: string;
@@ -3080,12 +3082,19 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const backToAlignFromExport = () => {
     setArStep("align");
   };
-  // 編集後の位置で焼き込み、合成画像をダウンロード。
-  const downloadComposite = async () => {
+  // 編集後の位置で焼き込み、まず書き出しプレビューを出す（すぐDLしない）。
+  const openExportPreview = async () => {
+    if (previewBaking) return;
+    setPreviewBaking(true);
     const url = await bakeComposite();
-    if (!url) return;
+    setPreviewBaking(false);
+    if (url) setPreviewUrl(url);
+  };
+  // プレビューを確認してから実際に保存する。
+  const saveExportImage = () => {
+    if (!previewUrl) return;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = previewUrl;
     a.download = "gsi-ar.jpg";
     a.click();
   };
@@ -4217,6 +4226,27 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
           </div>
         </div>
       )}
+      {/* 書き出しプレビュー。焼き込んだ合成画像を確認してから、保存するか選ぶ。 */}
+      {previewUrl !== null && (
+        <div className="ar-preview" onClick={() => setPreviewUrl(null)}>
+          <div className="ar-preview-card" onClick={(e) => e.stopPropagation()}>
+            <div className="ar-preview-head">
+              <span>書き出しプレビュー</span>
+              <span className="ar-preview-note">この内容で保存します。よければダウンロードしてください。</span>
+            </div>
+            <div className="ar-preview-body">
+              <img src={previewUrl} alt="書き出しプレビュー" />
+            </div>
+            <div className="ar-preview-actions">
+              <button className="ar-btn-sub" onClick={() => setPreviewUrl(null)}>もどる</button>
+              <button className="ar-btn-main" onClick={saveExportImage}>
+                <IconDownload size={15} />
+                ダウンロード
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {appMode === "ar" && arStep === "export" && exportView === "edit" && (
         <div className="ar-edit">
           <div
@@ -5137,9 +5167,13 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                   >
                     テンプレート
                   </button>
-                  <button className="ar-btn-main" disabled={arLabels.length === 0} onClick={downloadComposite}>
+                  <button
+                    className="ar-btn-main"
+                    disabled={arLabels.length === 0 || previewBaking}
+                    onClick={openExportPreview}
+                  >
                     <IconDownload size={15} />
-                    ダウンロード
+                    {previewBaking ? "生成中…" : "書き出す"}
                   </button>
                 </div>
               </>
