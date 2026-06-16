@@ -4152,7 +4152,10 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                     title={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     aria-label={appMode === "live" ? "確認へ（次へ）" : "微調整へ（次へ）"}
                     onClick={() =>
-                      switchViewWithFade({ kind: "phase", step: 4, name: "微調整" }, goAlignFromSelect)
+                      switchViewWithFade(
+                        { kind: "phase", step: 4, name: appMode === "live" ? "確認" : "微調整" },
+                        goAlignFromSelect,
+                      )
                     }
                   >
                     次へ
