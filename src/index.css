@@ -2223,6 +2223,60 @@ body,
 .ar-caption:active {
   cursor: grabbing;
 }
+/* センタータイトル（ポスター風）。写真中央に大きな山名を据える独立要素。
+   中心アンカー（translate -50%,-50%）で配置し、3段を中央寄せで縦に積む。
+   文字サイズは写真長辺（cqmax）基準で、焼き込み（bakeComposite）と見た目を合わせる。 */
+.ar-title {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: calc(0.3cqmax * var(--title-fs, 1));
+  font-family: var(--title-ff, inherit);
+  color: #fff;
+  text-shadow:
+    0 0 0.2cqmax var(--title-sh, rgba(0, 0, 0, 0.85)),
+    0 0.1cqmax 0.5cqmax var(--title-sh, rgba(0, 0, 0, 0.85));
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  white-space: nowrap;
+}
+.ar-title:active {
+  cursor: grabbing;
+}
+.ar-title-over {
+  font-size: calc(1.95cqmax * var(--title-fs, 1)); /* 大タイトルの約0.26倍 */
+  font-weight: 500;
+  letter-spacing: 0.35em;
+  margin-right: -0.35em; /* letter-spacing ぶんの右寄りを打ち消して中央に保つ */
+  margin-bottom: calc(0.9cqmax * var(--title-fs, 1));
+}
+.ar-title-main {
+  font-size: calc(7.5cqmax * var(--title-fs, 1)); /* 写真長辺の 7.5% × タイトル倍率 */
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-right: -0.04em;
+  line-height: 1.02;
+}
+.ar-title-num {
+  font-size: calc(2.25cqmax * var(--title-fs, 1)); /* 大タイトルの約0.30倍 */
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+  margin-top: calc(0.7cqmax * var(--title-fs, 1));
+}
+/* 選択枠（編集UIのみ・出力には焼き込まれない）。 */
+.ar-title::before {
+  content: "";
+  position: absolute;
+  inset: -1.2cqmax -1.6cqmax;
+  border: 0.2cqmax solid rgba(214, 180, 106, 0.6);
+  border-radius: 1cqmax;
+  pointer-events: none;
+}
 /* 切り抜き調整モード: フル写真＋ドラッグ枠を被せる層。 */
 .ar-crop-edit {
   position: absolute;
@@ -2288,11 +2342,13 @@ body,
 .ar-edit-stage.is-image-mode .ar-edit-label,
 .ar-edit-stage.is-image-mode .ar-edit-dot,
 .ar-edit-stage.is-image-mode .ar-caption,
+.ar-edit-stage.is-image-mode .ar-title,
 .ar-edit-stage.is-image-mode .ar-stamp {
   pointer-events: none;
 }
 .ar-edit-stage.is-image-mode .ar-cap-handle,
 .ar-edit-stage.is-image-mode .ar-caption::before,
+.ar-edit-stage.is-image-mode .ar-title::before,
 .ar-edit-stage.is-image-mode .ar-edit-label::before,
 .ar-edit-stage.is-image-mode .ar-stamp::before,
 .ar-edit-stage.is-image-mode .ar-edit-chrome,

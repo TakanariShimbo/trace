@@ -333,6 +333,17 @@ export function IconSettings({ size = 16, className }: Props) {
   );
 }
 
+/** 大きな「T」（文字・タイトル）。ポスター風の中央タイトル（センタータイトル）用。 */
+export function IconType({ size = 16, className }: Props) {
+  return (
+    <svg {...svgProps(size, className)}>
+      <path d="M5 6 H19" />
+      <path d="M12 6 V19" />
+      <path d="M9 19 H15" />
+    </svg>
+  );
+}
+
 /** コンパス（向き・画角）。円＋方位ポインタ。向き・画角セクションの見出し用。 */
 export function IconCompass({ size = 16, className }: Props) {
   return (
