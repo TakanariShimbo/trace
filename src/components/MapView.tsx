@@ -32,6 +32,7 @@ import {
   IconSearch,
   IconCompass,
   IconLandscape,
+  IconType,
 } from "./icons";
 import {
   worldToLonLat,
@@ -313,6 +314,17 @@ type ExportStyle = {
   capShowElev: boolean; // 標高をタグに出す
   capShowLoc: boolean; // 場所をタグに出す
   capSelectedTags: string[]; // 選択中のタグ（山ごとに存在するものだけ反映）
+  // センタータイトル（ポスター風）。写真中央に大きなタイトルを置く独立要素。
+  // 小見出し（場所）＋大タイトル（山名）＋数値情報（標高）の3段。位置はドラッグで動かす。
+  titleOn: boolean; // センタータイトルを焼き込むか
+  titleLang: "en" | "ja"; // タイトルの言語（英＝大文字のポスター風 / 和）
+  titleShowOver: boolean; // 小見出し（場所）を出すか
+  titleShowNum: boolean; // 数値情報（標高）を出すか
+  titleScale: number; // 大タイトルのサイズ倍率
+  titleColor: string;
+  titleShadow: boolean;
+  titleFont: FontPairId;
+  titlePos: { u: number; v: number }; // タイトルブロックの中心（写真座標）
   roleFonts: RoleFonts;
   stampOn: boolean;
   stampStyle: StampStyle;
@@ -358,6 +370,15 @@ const BASE_STYLE: ExportStyle = {
   capShowElev: false,
   capShowLoc: false,
   capSelectedTags: [],
+  titleOn: false,
+  titleLang: "en",
+  titleShowOver: true,
+  titleShowNum: true,
+  titleScale: 1,
+  titleColor: "#ffffff",
+  titleShadow: true,
+  titleFont: "posterMincho",
+  titlePos: { u: 0.5, v: 0.44 },
   roleFonts: DEFAULT_ROLE_FONTS,
   stampOn: false,
   stampStyle: "contour",
@@ -373,6 +394,26 @@ const BASE_STYLE: ExportStyle = {
   frameFade: 0,
 };
 const EXPORT_TEMPLATES: ExportTemplate[] = [
+  {
+    id: "chou",
+    name: "頂",
+    sub: "センタータイトル",
+    hint: "写真中央に大きな山名を据えるポスター風。小見出し・標高を添える。",
+    style: {
+      ...BASE_STYLE,
+      bakeLabels: false,
+      captionLang: "none",
+      titleOn: true,
+      titleLang: "en",
+      titleShowOver: true,
+      titleShowNum: true,
+      titleScale: 1.35,
+      titleColor: "#ffffff",
+      titleShadow: true,
+      titleFont: "posterMincho",
+      titlePos: { u: 0.5, v: 0.46 },
+    },
+  },
   {
     id: "miyabi",
     name: "雅",
@@ -738,6 +779,21 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
           ? [{ text: capName, sub: false }, { text: capNameEn, sub: true }]
           : []; // each
   const capSharedRow = captionTitleMode === "groupH";
+  // センタータイトルの3段（小見出し=場所 / 大タイトル=山名 / 数値=標高）を「取り上げる山」から作る。
+  // 英語のときは大見出し・小見出しを大文字化してポスター風に。山が無ければ null。
+  const titleParts = (): { over: string; main: string; num: string } | null => {
+    const it = arLabels[captionIdx];
+    if (!it) return null;
+    const en = titleLang === "en";
+    const up = (s: string) => (en ? s.toUpperCase() : s);
+    const main = up(en ? it.nameEn || it.name : it.name);
+    const over =
+      titleShowOver && it.prefecture
+        ? up(en ? prefEn(it.prefecture) : it.prefecture.replace(/\//g, "・"))
+        : "";
+    const num = titleShowNum ? `${Math.round(it.elevM).toLocaleString()} ${en ? "M" : "m"}` : "";
+    return { over, main, num };
+  };
   // 山名ラベルを写真に焼き込むか（既定ON）。
   const [bakeLabels, setBakeLabels] = useState(true);
   // ラベルの内容パターン（1段目=主名／2段目=補足の組み合わせ）。
@@ -849,6 +905,18 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
   const [stampAccent, setStampAccent] = useState("#d6b46a");
   const [stampShowInfo, setStampShowInfo] = useState(true);
   const [stampOrient, setStampOrient] = useState<StampOrientation>("heading");
+  // センタータイトル（ポスター風）。写真中央に大きな山名を据える独立要素。既定はオフ。
+  // 内容は「取り上げる山」(captionIdx)から作る: 小見出し=場所 / 大タイトル=山名 / 数値=標高。
+  const [titleOn, setTitleOn] = useState(false);
+  const [titleLang, setTitleLang] = useState<"en" | "ja">("en");
+  const [titleShowOver, setTitleShowOver] = useState(true);
+  const [titleShowNum, setTitleShowNum] = useState(true);
+  const [titleScale, setTitleScale] = useState(1);
+  const [titleColor, setTitleColor] = useState("#ffffff");
+  const [titleShadow, setTitleShadow] = useState(true);
+  const [titleFont, setTitleFont] = useState<FontPairId>("posterMincho");
+  const [titlePos, setTitlePos] = useState({ u: 0.5, v: 0.44 }); // ブロック中心（写真座標）
+  const titleDragRef = useRef<{ offU: number; offV: number } | null>(null); // タイトルドラッグの掴み位置
   // 仕上げ画面の表示モード。export に入った直後はテンプレ選択、選ぶと編集へ。
   const [exportView, setExportView] = useState<"template" | "edit">("template");
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null); // 適用中テンプレ（いじると custom=null）
@@ -958,7 +1026,7 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     frameMargin.l,
     frameMargin.r,
   ]);
-  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" | "stamp" } | null>(null); // ドラッグ中の対象
+  const arDragRef = useRef<{ i: number; kind: "dot" | "label" | "labelAnchor" | "caption" | "capResize" | "capSplit" | "stamp" | "title" } | null>(null); // ドラッグ中の対象
   // AR下部パネルの折りたたみ/移動（縦画像や地図を見やすくするため）。
   const [arPanelOpen, setArPanelOpen] = useState(true); // 折りたたみ（false=畳む）
   const [arDockOffset, setArDockOffset] = useState({ x: 0, y: 0 }); // ドックのドラッグ移動量(px)
@@ -2956,6 +3024,60 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         ctx.restore();
       }
     }
+    // === センタータイトル（ポスター風）の焼き込み。すべての上に、中央寄せの3段で描く。 ===
+    {
+      const tp = titleParts();
+      if (titleOn && tp) {
+        const cx = pfx(titlePos.u); // ブロック中心（写真座標→出力座標）
+        const cy = pfy(titlePos.v);
+        const ffTitle = roleFontStack(titleFont);
+        const p = FONT_PAIRS[titleFont];
+        await Promise.all([
+          document.fonts.load(`700 16px "${p.jp}"`).catch(() => {}),
+          document.fonts.load(`700 16px "${p.en}"`).catch(() => {}),
+          document.fonts.load(`500 16px "${p.jp}"`).catch(() => {}),
+          document.fonts.load(`500 16px "${p.en}"`).catch(() => {}),
+        ]);
+        const mainFs = Math.round(L * 0.075 * titleScale); // 大タイトル
+        const overFs = Math.max(1, Math.round(mainFs * 0.26)); // 小見出し（場所）
+        const numFs = Math.max(1, Math.round(mainFs * 0.3)); // 数値（標高）
+        const overGap = Math.round(mainFs * 0.42);
+        const numGap = Math.round(mainFs * 0.34);
+        const totalH = (tp.over ? overFs + overGap : 0) + mainFs + (tp.num ? numGap + numFs : 0);
+        let y = cy - totalH / 2; // 中心に対してブロックを縦に揃える
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillStyle = titleColor;
+        if (titleShadow) {
+          ctx.shadowColor = contrastShadow(titleColor);
+          ctx.shadowBlur = Math.round(L * 0.006);
+          ctx.shadowOffsetY = Math.max(1, Math.round(L * 0.0015));
+        }
+        // 文字間隔（ポスター風に少し広げる）。letterSpacing 非対応環境では無視される。
+        const setLS = (px: number) => {
+          (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = `${px}px`;
+        };
+        if (tp.over) {
+          ctx.font = `500 ${overFs}px ${ffTitle}`;
+          setLS(overFs * 0.35);
+          ctx.fillText(tp.over, cx, y);
+          y += overFs + overGap;
+        }
+        ctx.font = `700 ${mainFs}px ${ffTitle}`;
+        setLS(mainFs * 0.04);
+        ctx.fillText(tp.main, cx, y);
+        y += mainFs;
+        if (tp.num) {
+          y += numGap;
+          ctx.font = `500 ${numFs}px ${ffTitle}`;
+          setLS(numFs * 0.3);
+          ctx.fillText(tp.num, cx, y);
+        }
+        setLS(0);
+        ctx.restore();
+      }
+    }
     return canvas.toDataURL("image/jpeg", 0.92);
   };
   // 微調整(④)→ 仕上げ(⑤)。選択山を写真フレーム内の正規化座標で取り、編集用に展開。
@@ -3022,6 +3144,15 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
     setCapShowElev(s.capShowElev);
     setCapShowLoc(s.capShowLoc);
     setCapSelectedTags(s.capSelectedTags);
+    setTitleOn(s.titleOn);
+    setTitleLang(s.titleLang);
+    setTitleShowOver(s.titleShowOver);
+    setTitleShowNum(s.titleShowNum);
+    setTitleScale(s.titleScale);
+    setTitleColor(s.titleColor);
+    setTitleShadow(s.titleShadow);
+    setTitleFont(s.titleFont);
+    setTitlePos(s.titlePos);
     setRoleFonts(s.roleFonts);
     setStampOn(s.stampOn);
     setStampStyle(s.stampStyle);
@@ -3066,6 +3197,15 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       capShowElev,
       capShowLoc,
       capSelectedTags,
+      titleOn,
+      titleLang,
+      titleShowOver,
+      titleShowNum,
+      titleScale,
+      titleColor,
+      titleShadow,
+      titleFont,
+      titlePos,
       roleFonts,
       stampOn,
       stampStyle,
@@ -3141,6 +3281,22 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
       stampDragRef.current = { offU: pu - sf.u, offV: pv - sf.v };
     }
     arDragRef.current = { i: -1, kind: "stamp" };
+  };
+  // センタータイトルのドラッグ開始。ブロック中心と掴んだ位置のズレを記録する。
+  const onTitleDown = (e: React.PointerEvent) => {
+    if (arExportMode === "image") return; // 画像モードは写真パン優先
+    e.preventDefault();
+    e.stopPropagation();
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    const stage = arFrameRef.current;
+    if (stage) {
+      const r = stage.getBoundingClientRect();
+      const pu = (e.clientX - r.left) / r.width;
+      const pv = (e.clientY - r.top) / r.height;
+      const tf = photoToFrame(titlePos.u, titlePos.v); // 中心の写真座標→フレームでズレを取る
+      titleDragRef.current = { offU: pu - tf.u, offV: pv - tf.v };
+    }
+    arDragRef.current = { i: -1, kind: "title" };
   };
   // 解説ブロックのリサイズ（4辺のハンドル）。右/左=幅、上/下=縦に伸ばすと幅が狭まる。文字サイズは固定。
   const onCapResizeDown = (e: React.PointerEvent) => {
@@ -3230,6 +3386,14 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
         el.style.top = `${fV * 100}%`;
       }
       stampPendingRef.current = frameToPhoto(fU, fV);
+      return;
+    }
+    if (d.kind === "title") {
+      // 中心アンカー。掴んだズレを引いた中心をフレーム内に収めて写真座標で保持する。
+      const off = titleDragRef.current ?? { offU: 0, offV: 0 };
+      const fU = Math.min(1, Math.max(0, u - off.offU));
+      const fV = Math.min(1, Math.max(0, v - off.offV));
+      setTitlePos(frameToPhoto(fU, fV));
       return;
     }
     if (d.kind === "capResize") {
@@ -4194,7 +4358,15 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                   onClick={() => applyTemplate(t)}
                 >
                   <span className="ar-tpl-thumb">
-                    <img src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`} alt="" loading="lazy" />
+                    {/* プレビュー画像が無いテンプレは、壊れアイコンを出さず名前だけ見せる。 */}
+                    <img
+                      src={`${import.meta.env.BASE_URL}template-previews/${t.id}.jpg`}
+                      alt=""
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
                     {activeTemplateId === t.id && <span className="ar-tpl-check" aria-hidden="true">✓</span>}
                   </span>
                   <span className="ar-tpl-card-body">
@@ -4545,6 +4717,35 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                 )}
               </div>
             )}
+            {/* センタータイトル（ポスター風）。中央寄せの3段。ドラッグで位置を動かす。
+                書き出しは bakeComposite が同じ内容で再生成する。 */}
+            {titleOn && (() => {
+              const tp = titleParts();
+              if (!tp) return null;
+              const tf = photoToFrame(titlePos.u, titlePos.v);
+              return (
+                <div
+                  className="ar-title"
+                  style={
+                    {
+                      left: `${tf.u * 100}%`,
+                      top: `${tf.v * 100}%`,
+                      color: titleColor,
+                      "--title-ff": roleFontStack(titleFont),
+                      "--title-fs": titleScale,
+                      "--title-sh": titleShadow ? contrastShadow(titleColor) : "transparent",
+                    } as React.CSSProperties
+                  }
+                  onPointerDown={onTitleDown}
+                  onPointerMove={onEditMove}
+                  onPointerUp={onEditUp}
+                >
+                  {tp.over && <span className="ar-title-over">{tp.over}</span>}
+                  <span className="ar-title-main">{tp.main}</span>
+                  {tp.num && <span className="ar-title-num">{tp.num}</span>}
+                </div>
+              );
+            })()}
             </div>
           </div>
           <div
@@ -4912,6 +5113,142 @@ export default function MapView({ appMode, onHome, settings, initialTarget }: Ma
                                     aria-label="解説本文サイズ"
                                   />
                                   {fontRow("captionBody", "本文フォント")}
+                                </>,
+                              )}
+                          </>
+                        ),
+                      }
+                    : null,
+                  arLabels.length > 0
+                    ? {
+                        id: "title",
+                        label: (
+                          <>
+                            <IconType size={13} /> タイトル
+                          </>
+                        ),
+                        content: (
+                          <>
+                            {arFlat(
+                              "title-common",
+                              "共通",
+                              <>
+                                <label className="switch-row">
+                                  <span>中央に大きなタイトルを入れる</span>
+                                  <input
+                                    type="checkbox"
+                                    className="switch"
+                                    checked={titleOn}
+                                    onChange={(e) => setTitleOn(e.target.checked)}
+                                  />
+                                </label>
+                                {titleOn && (
+                                  <>
+                                    <div className="ar-fs-row">
+                                      <span>言語</span>
+                                      <div className="seg" role="group" aria-label="タイトルの言語">
+                                        {([["英語", "en"], ["日本語", "ja"]] as [string, "en" | "ja"][]).map(([lab, v]) => (
+                                          <button key={v} className={titleLang === v ? "is-active" : ""} onClick={() => setTitleLang(v)}>
+                                            {lab}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <label className="switch-row">
+                                      <span>小見出し（場所）</span>
+                                      <input
+                                        type="checkbox"
+                                        className="switch"
+                                        checked={titleShowOver}
+                                        onChange={(e) => setTitleShowOver(e.target.checked)}
+                                      />
+                                    </label>
+                                    <label className="switch-row">
+                                      <span>数値（標高）</span>
+                                      <input
+                                        type="checkbox"
+                                        className="switch"
+                                        checked={titleShowNum}
+                                        onChange={(e) => setTitleShowNum(e.target.checked)}
+                                      />
+                                    </label>
+                                    <div className="ar-fs-row">
+                                      <span>文字の色</span>
+                                      <input
+                                        type="color"
+                                        className="ar-color-input"
+                                        value={titleColor}
+                                        onChange={(e) => setTitleColor(e.target.value)}
+                                        aria-label="タイトルの文字の色"
+                                      />
+                                    </div>
+                                    <label className="switch-row">
+                                      <span>文字の影</span>
+                                      <input
+                                        type="checkbox"
+                                        className="switch"
+                                        checked={titleShadow}
+                                        onChange={(e) => setTitleShadow(e.target.checked)}
+                                      />
+                                    </label>
+                                    {arLabels.length > 1 && (
+                                      <>
+                                        <div className="ar-fs-row">
+                                          <span>取り上げる山</span>
+                                        </div>
+                                        <div className="ar-caption-pick">
+                                          {arLabels.map((l, i) => (
+                                            <button
+                                              key={i}
+                                              className={`ar-cap-chip${i === captionIdx ? " is-on" : ""}`}
+                                              onClick={() => setCaptionIdx(i)}
+                                            >
+                                              {l.name}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </>,
+                            )}
+                            {titleOn &&
+                              arSec(
+                                "title-main",
+                                "大きさ・フォント",
+                                <>
+                                  <div className="ar-fs-slider-row">
+                                    <span>タイトルサイズ</span>
+                                    <span className="ar-fs-val">{Math.round(titleScale * 100)}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    className="ar-fs-slider"
+                                    min={0.7}
+                                    max={2.0}
+                                    step={0.05}
+                                    value={titleScale}
+                                    onChange={(e) => setTitleScale(Number(e.target.value))}
+                                    aria-label="タイトルサイズ"
+                                  />
+                                  <div className="ar-fs-row">
+                                    <span>フォント</span>
+                                    <div className="ar-font-sel">
+                                      <select
+                                        value={titleFont}
+                                        onChange={(e) => setTitleFont(e.target.value as FontPairId)}
+                                        aria-label="タイトルフォント"
+                                      >
+                                        {FONT_PAIR_IDS.map((id) => (
+                                          <option key={id} value={id} title={FONT_PAIRS[id].description}>
+                                            {FONT_PAIRS[id].label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <p className="ar-font-desc">{FONT_PAIRS[titleFont].description}</p>
                                 </>,
                               )}
                           </>
