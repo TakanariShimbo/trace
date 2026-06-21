@@ -395,26 +395,6 @@ const BASE_STYLE: ExportStyle = {
 };
 const EXPORT_TEMPLATES: ExportTemplate[] = [
   {
-    id: "chou",
-    name: "頂",
-    sub: "センタータイトル",
-    hint: "写真中央に大きな山名を据えるポスター風。小見出し・標高を添える。",
-    style: {
-      ...BASE_STYLE,
-      bakeLabels: false,
-      captionLang: "none",
-      titleOn: true,
-      titleLang: "en",
-      titleShowOver: true,
-      titleShowNum: true,
-      titleScale: 1.35,
-      titleColor: "#ffffff",
-      titleShadow: true,
-      titleFont: "posterMincho",
-      titlePos: { u: 0.5, v: 0.46 },
-    },
-  },
-  {
     id: "miyabi",
     name: "雅",
     sub: "定番・山名入り",
@@ -450,6 +430,26 @@ const EXPORT_TEMPLATES: ExportTemplate[] = [
       stampOn: true,
       stampAccent: "#d8ff4a",
       stampPos: { u: 0.77, v: 0.66 },
+    },
+  },
+  {
+    id: "chou",
+    name: "頂",
+    sub: "センタータイトル",
+    hint: "写真中央に大きな山名を据えるポスター風。小見出し・標高を添える。",
+    style: {
+      ...BASE_STYLE,
+      bakeLabels: false,
+      captionLang: "none",
+      titleOn: true,
+      titleLang: "en",
+      titleShowOver: true,
+      titleShowNum: true,
+      titleScale: 1.35,
+      titleColor: "#ffffff",
+      titleShadow: true,
+      titleFont: "posterMincho",
+      titlePos: { u: 0.5, v: 0.46 },
     },
   },
   {
